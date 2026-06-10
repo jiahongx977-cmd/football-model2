@@ -1,23 +1,31 @@
-足球投注模型 V3.4 完整部署包
+足球投注模型 V4.0 实战修正版
 
-用途：
-- 朋友打开网址即可使用，不需要每个人自己填 The Odds API Key。
-- API Key 放在 Vercel 后台环境变量，不写进网页源码，避免泄露。
+这版修正用户指出的两个核心问题：
 
-部署方法：
-1. 解压本压缩包。
-2. 确认解压后有 index.html、package.json、vercel.json、api 文件夹。
-3. 打开 https://vercel.com 登录。
-4. 新建项目，把整个文件夹 football_model_v3_4_complete 上传/导入。
-5. 在 Vercel 项目设置里找到 Environment Variables。
-6. 新增环境变量：
-   Name: THE_ODDS_API_KEY
-   Value: 你的 The Odds API Key
-7. 保存后 Redeploy。
-8. 部署成功后，把 Vercel 给的网址发给朋友。
+1. 第三点“选中比赛后自动分析”中，新增独立的“本场波胆推荐（模型自动推演）”
+   - 不是只在下面 Dutching 区显示
+   - 选中比赛并点击“按完整模型重新分析”后，会直接显示至少 4 个波胆
+   - 波胆来自当前比赛模型推演：
+     赔率、天气、教练、阵容、体能、裁判、盘口热度等
+   - 包含：排序、剧本、波胆、模型权重、推荐用途、说明
 
-重要：
-- 不要把 API Key 写进 index.html。
-- api/sports.js 和 api/odds.js 是服务器接口，不是网页。
-- 本地双击 index.html 只能看界面，无法通过服务器代理联网。
-- 如果接口没有某场比赛，仍可用“手动分析模式”输入盘口数据。
+2. “波胆 / 冠军 Dutching 分配”页面新增截图/图片 OCR
+   - 可上传波胆盘口截图或冠军赔率截图
+   - 可预览图片
+   - 可读取截图赔率
+   - 可从识别结果自动填入 Dutching 表格
+   - OCR 可能误读，需要人工核对
+
+保留 V3.9 功能：
+- 当前滚球赔率截图 OCR
+- 对冲权重自动计算
+- 收益/ROI 矩阵
+- 首页本场波胆 Dutching 快捷区
+- 模型遗漏因素留言
+- 中文赛事名
+
+升级方法：
+不用重新申请 Key。
+不用重新创建 Vercel。
+不用重新创建 GitHub 仓库。
+解压后上传覆盖到原 GitHub 仓库 football-model2，Vercel 会自动部署。
