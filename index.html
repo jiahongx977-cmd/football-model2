@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>足球投注模型 V3.7 实战操作增强版</title>
+<title>JAX的AI模型</title>
 <style>
 :root{
   --bg:#f3f4f6;--card:#fff;--ink:#111827;--muted:#6b7280;--line:#e5e7eb;
@@ -71,12 +71,22 @@ footer{text-align:center;color:var(--muted);padding:28px;font-size:12px}
 .scoreInput{max-width:120px}
 
 @media(max-width:900px){.grid,.grid3,.grid4{grid-template-columns:1fr}.card{padding:14px}header{padding:16px}}
+
+.modelScoresBox{margin-top:14px;border:1px solid #fde68a;background:#fffbeb;border-radius:14px;padding:14px}
+.modelScoresBox h3{margin-top:0}
+.ocrMini{background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0}
+.imgPreviewSmall{max-width:100%;max-height:300px;border:1px solid var(--line);border-radius:12px;margin-top:10px;display:none}
+.matrix td,.matrix th{text-align:center}
+.matrix .win{background:#dcfce7;color:#166534;font-weight:800}
+.matrix .loss{background:#fee2e2;color:#991b1b;font-weight:800}
+
+.hedgeUploadBox{background:#f8fafc;border:1px solid var(--line);border-radius:14px;padding:12px;margin:12px 0}
+hr{border:none;border-top:1px solid var(--line);margin:18px 0}
 </style>
 </head>
 <body>
-<header>
-  <h1>足球投注模型 V3.7 实战操作增强版</h1>
-  <p>联网赔率 + 天气优先 + 盘口凯利 + 教练控分 + 裁判因素 + 剧本分层 + Dutching + 滚球对冲 + 赛后复盘</p>
+<header><h1>JAX的AI模型</h1>
+<p>联网赔率 + 天气/战意/教练/阵容/体能/裁判因素 + 模型比分池 + Dutching + 滚球对冲OCR + 赛后复盘</p>
 </header>
 <div class="notice">
   使用说明：API Key 仍然只放在 Vercel 环境变量 <b>THE_ODDS_API_KEY</b> 中，朋友打开网站不需要自己填 Key。
@@ -297,6 +307,18 @@ footer{text-align:center;color:var(--muted);padding:28px;font-size:12px}
 
       <div id="analysisResult" class="result-box">等待选择比赛。</div>
 
+      <div class="modelScoresBox">
+        <h3>本场波胆推荐（模型自动推演）</h3>
+        <p class="small">
+          选中比赛并点击“按完整模型重新分析”后，这里会直接显示至少 4 个波胆。
+          数据来自当前比赛赔率、天气、教练、阵容、体能、裁判、盘口热度等模型因素。
+        </p>
+        <table id="modelScoreTable">
+          <thead><tr><th>排序</th><th>剧本</th><th>波胆</th><th>模型权重</th><th>推荐用途</th><th>说明</th></tr></thead>
+          <tbody><tr><td colspan="6">等待选择比赛并分析。</td></tr></tbody>
+        </table>
+      </div>
+
       <div class="inlineDutch">
         <h3>四、本场波胆 Dutching 快捷区</h3>
         <p class="small">
@@ -431,20 +453,73 @@ footer{text-align:center;color:var(--muted);padding:28px;font-size:12px}
   <section id="live" class="tab hidden">
     <div class="card">
       <h2>滚球 / 对冲触发器</h2>
-      <p class="small">比赛中出现触发条件时，不一定马上加仓；先判断赛前剧本是否被否定，再决定对冲、减仓或放弃。</p>
-      <div class="grid3">
-        <div><label>当前比分</label><input id="liveScore" placeholder="如 0-0 / 1-0"/></div>
-        <div><label>比赛分钟</label><input id="liveMin" type="number" placeholder="如 15 / 45 / 60"/></div>
+      <p class="small">这一页现在支持两张图片：① 你赛前已经下单的截图；② 当前滚球赔率截图。系统会先 OCR 读取，再结合你填写/修正后的信息自动给出对冲思路、金额、收益和 ROI。</p>
+
+      <div class="hedgeUploadBox">
+        <h3>一、原下注截图 / 凭证截图</h3>
+        <p class="small">例如：你开球前买了多少钱、买了什么盘口、赔率多少。上传后可自动识别，再手动修正。</p>
+        <input id="hedgeImage" type="file" accept="image/*" onchange="previewHedgeImage(event)"/>
+        <img id="hedgePreview" class="imgPreviewSmall"/>
+        <div class="flex" style="margin-top:10px">
+          <button class="btn purple" onclick="ocrHedgeSlip()">读取原下注截图</button>
+          <button class="btn orange" onclick="parseHedgeSlipFields()">把识别结果填入原单字段</button>
+        </div>
+        <label>原下注 OCR 文本</label>
+        <textarea id="hedgeSlipOcrText" placeholder="原下注截图识别结果会显示在这里，也可以手动粘贴文字。"></textarea>
+        <label>原下注说明 / 备注</label>
+        <textarea id="hedgeImgNote" placeholder="例如：赛前买主胜 3000，赔率 1.92；或者：买让球主 -0.5。"></textarea>
+      </div>
+
+      <div class="grid4">
+        <div><label>原单方向</label><input id="preBetPick" placeholder="如 主胜 / 小2.5 / 主-0.5"/></div>
+        <div><label>原单本金</label><input id="preBetStake" type="number" placeholder="如 3000"/></div>
+        <div><label>原单赔率</label><input id="preBetOdds" type="number" step="0.01" placeholder="如 1.92"/></div>
+        <div><label>原单当前命中概率%</label><input id="preBetLiveProb" type="number" step="0.1" placeholder="可空，模型默认估算"/></div>
+      </div>
+
+      <hr>
+      <h3>二、当前滚球局面</h3>
+      <div class="grid4">
+        <div><label>当前比分</label><input id="hedgeScore" placeholder="如 0-0 / 1-0"/></div>
+        <div><label>比赛分钟</label><input id="hedgeMinute" type="number" placeholder="如 15 / 45 / 60"/></div>
         <div><label>当前盘口变化</label><select id="liveOddsMove"><option value="normal">正常</option><option value="fav_down">热门降水</option><option value="fav_up">热门升水</option><option value="reverse">盘口反跳</option><option value="suspend">盘口频繁封盘</option></select></div>
+        <div><label>强队压制质量</label><select id="livePressure"><option value="low">压不进去</option><option value="mid">一般</option><option value="high">持续高压</option></select></div>
       </div>
       <div class="grid4">
-        <div><label>强队压制质量</label><select id="livePressure"><option value="low">压不进去</option><option value="mid">一般</option><option value="high">持续高压</option></select></div>
         <div><label>射门/角球</label><select id="liveShots"><option value="low">少</option><option value="mid">正常</option><option value="high">很多</option></select></div>
         <div><label>红黄牌</label><select id="liveCards"><option value="none">无明显</option><option value="yellow">早牌多</option><option value="red">红牌</option></select></div>
         <div><label>换人信号</label><select id="liveSubs"><option value="none">无</option><option value="attack">加强进攻</option><option value="defend">保守防守</option><option value="star_out">核心下场</option></select></div>
+        <div><label>临场补充备注</label><input id="hedgeSceneNote" placeholder="如 门将伤退 / 大雨 / VAR频繁"/></div>
       </div>
-      <button class="btn primary" onclick="liveAnalyze()">生成滚球建议</button>
+      <div class="flex"><button class="btn primary" onclick="liveAnalyze()">先看滚球触发建议</button></div>
       <div id="liveResult" class="result-box">等待输入。</div>
+
+      <hr>
+      <div class="hedgeUploadBox">
+        <h3>三、当前实时赔率截图</h3>
+        <p class="small">例如：你现在想对冲时，平台上给出的平局、客胜、受让、大小球、下一球等赔率截图。系统可自动提取赔率数字生成对冲池。</p>
+        <input id="liveOddsImage" type="file" accept="image/*" onchange="previewLiveOddsImage(event)"/>
+        <img id="liveOddsPreview" class="imgPreviewSmall"/>
+        <div class="flex" style="margin-top:10px">
+          <button class="btn purple" onclick="ocrLiveOdds()">读取实时赔率截图</button>
+          <button class="btn orange" onclick="parseOcrToHedgeOptions()">从截图生成对冲池</button>
+        </div>
+        <label>实时赔率 OCR 文本</label>
+        <textarea id="ocrText" placeholder="实时赔率截图识别结果会显示在这里，也可以手动粘贴盘口文字。"></textarea>
+      </div>
+
+      <h3>四、对冲池 / 自动权重</h3>
+      <p class="small">你不用自己分配权重。系统会根据当前可买赔率自动换算系统概率和保护权重。你只需要核对“方向名称”和“赔率”是否正确。</p>
+      <table id="hedgeOptionTable">
+        <thead><tr><th>对冲方向</th><th>当前赔率</th><th>系统概率%</th><th>系统权重%</th><th>说明</th><th>操作</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="flex">
+        <button class="btn" onclick="addHedgeOption()">添加一行</button>
+        <button class="btn blue" onclick="autoWeightHedgeOptions(true)">自动计算权重</button>
+        <button class="btn primary" onclick="calcHedge()">生成自动对冲分析</button>
+      </div>
+      <div id="hedgeCalcResult" class="result-box">等待你上传截图或填写原单与当前赔率。</div>
     </div>
   </section>
 
@@ -490,8 +565,76 @@ footer{text-align:center;color:var(--muted);padding:28px;font-size:12px}
     </div>
   </section>
 </main>
-<footer>V3.7 实战操作增强版｜首页波胆 Dutching + 模型比分池 + 留言记录 + 中文赛事名。</footer>
+<footer>JAX的AI模型｜V4.2 OCR滚球对冲升级版｜支持原下注截图 + 实时赔率截图自动分析。</footer>
 
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js">
+function previewDutchImage(e){
+  const file=e.target.files && e.target.files[0];
+  const img=document.getElementById("dutchPreview");
+  if(!file){img.style.display="none";return;}
+  const reader=new FileReader();
+  reader.onload=ev=>{img.src=ev.target.result;img.style.display="block";};
+  reader.readAsDataURL(file);
+}
+async function ocrDutchImage(){
+  const input=document.getElementById("dutchImage");
+  const out=document.getElementById("dutchOcrText");
+  if(!input.files || !input.files[0]){
+    alert("请先上传波胆/冠军赔率截图。");
+    return;
+  }
+  if(!window.Tesseract){
+    alert("OCR库没有加载成功。你可以手动把盘口文字粘贴到文本框。");
+    return;
+  }
+  out.value="正在识别截图，请等一会儿...";
+  try{
+    const result=await Tesseract.recognize(input.files[0],"eng+chi_sim",{
+      logger:m=>{ if(m.status) out.value=`OCR处理中：${m.status} ${m.progress?Math.round(m.progress*100)+"%":""}`; }
+    });
+    out.value=result.data.text||"";
+  }catch(e){
+    out.value="OCR识别失败："+e.message+"\\n你可以手动把盘口文字粘贴到这里。";
+  }
+}
+function parseDutchPairs(text){
+  const lines=(text||"").split(/\\n+/).map(x=>x.trim()).filter(Boolean);
+  const rows=[];
+  const oddsRegex=/(\\d+(?:\\.\\d+)?)/g;
+  lines.forEach(line=>{
+    let clean=line.replace(/[Il|]/g,"1").replace(/[Oo]/g,"0").replace(/，/g,".").replace(/。/g,".");
+    const nums=[...clean.matchAll(oddsRegex)].map(m=>m[1]);
+    if(!nums.length)return;
+    let odds=null;
+    for(const s of nums.reverse()){
+      let n=parseFloat(s);
+      if(n>=100 && n<=999) n=n/100;
+      if(n>=1.01 && n<=80){odds=n;break;}
+    }
+    if(!odds)return;
+    let name=clean.replace(oddsRegex," ").replace(/\\s+/g," ").trim();
+    const scoreMatch=line.match(/\\b\\d{1,2}\\s*[-:]\\s*\\d{1,2}\\b/);
+    if(scoreMatch) name=scoreMatch[0].replace(":","-").replace(/\\s/g,"");
+    if(!name || name.length>30) name="";
+    rows.push({name,odds});
+  });
+  if(rows.length)return rows.slice(0,20);
+  const nums=extractOddsNumbers(text);
+  return nums.map((n,i)=>({name:`截图赔率${i+1}`,odds:n}));
+}
+function parseDutchOcrToRows(){
+  const text=document.getElementById("dutchOcrText").value;
+  const rows=parseDutchPairs(text);
+  if(!rows.length){
+    alert("没有识别到赔率。你可以手动输入。");
+    return;
+  }
+  const tb=document.querySelector("#dutchTable tbody");
+  tb.innerHTML="";
+  rows.forEach((r,i)=>addDutchRow(r.name||`截图赔率${i+1}`,fmt(r.odds), i<5?20:""));
+}
+
+</script>
 <script>
 const SPORT_CN={
   soccer_fifa_world_cup:"世界杯",
@@ -549,8 +692,8 @@ const DEFAULT_SPORTS=[
   ["soccer_china_superleague","Chinese Super League"]
 ];
 let eventsCache=[], selectedEvent=null, lastAnalysis=null, currentScorelines=[];
-const LS_REVIEW="football_v37_reviews";
-const LS_NOTES="football_v37_model_notes";
+const LS_REVIEW="football_v41reviews";
+const LS_NOTES="football_v41model_notes";
 
 function showTab(id,btn){
   document.querySelectorAll(".tab").forEach(x=>x.classList.add("hidden"));
@@ -843,6 +986,7 @@ function analyzeSelected(force){
 
   lastAnalysis={match:`${ev.home_team} vs ${ev.away_team}`,pick:priority[0].pick,score:scorelines[0].score,html,createdAt:new Date().toISOString()};
   document.getElementById("analysisResult").innerHTML=html;
+  renderModelScoreTable();
   generateInlineDutchFromModel();
 }
 function evCalc(p,o){return p/100*o-1}
@@ -988,6 +1132,28 @@ function calcDutch(){
 }
 
 
+
+function renderModelScoreTable(){
+  const tb=document.querySelector("#modelScoreTable tbody");
+  if(!tb)return;
+  if(!currentScorelines || !currentScorelines.length){
+    tb.innerHTML=`<tr><td colspan="6">等待选择比赛并分析。</td></tr>`;
+    return;
+  }
+  const rows=currentScorelines.slice(0, Math.max(4, currentScorelines.length));
+  tb.innerHTML=rows.map((s,i)=>{
+    let use=i===0?"主仓候选":i===1?"二仓候选":i===2?"防守保护":i===3?"爆点小仓":"冷门保护";
+    return `<tr>
+      <td>${i+1}</td>
+      <td>${s.scene}</td>
+      <td><b>${s.score}</b></td>
+      <td>${s.weight}%<div class="scorebar"><span style="width:${s.weight}%"></span></div></td>
+      <td>${use}</td>
+      <td>${s.note}</td>
+    </tr>`;
+  }).join("");
+}
+
 function generateInlineDutchFromModel(){
   const tb=document.querySelector("#inlineDutchTable tbody");
   if(!currentScorelines.length){
@@ -1058,21 +1224,26 @@ function sendInlineDutchToDutchTab(){
 }
 
 function liveAnalyze(){
-  const min=safeNum(document.getElementById("liveMin").value)||0;
-  const score=document.getElementById("liveScore").value||"未知";
-  const pressure=document.getElementById("livePressure").value, shots=document.getElementById("liveShots").value, cards=document.getElementById("liveCards").value, subs=document.getElementById("liveSubs").value, move=document.getElementById("liveOddsMove").value;
-  let advice=[], risk=0;
-  if(min<=15&&pressure==="low") advice.push("开局压不进去，不追热门让球。");
-  if(pressure==="high"&&shots==="high") advice.push("持续高压且射门/角球多，下一个进球概率上升。");
-  if(cards==="red"){advice.push("红牌出现，赛前模型失效，重新按人数和比分判断。");risk+=20;}
-  if(cards==="yellow"){advice.push("早牌多，红牌/点球风险上升。");risk+=8;}
-  if(subs==="star_out") advice.push("核心下场，热门穿盘和大球概率下调。");
+  const score=(document.getElementById("liveScore")?.value||document.getElementById("hedgeScore")?.value||"").trim();
+  const min=safeNum((document.getElementById("liveMin")?.value||document.getElementById("hedgeMinute")?.value||""));
+  const move=document.getElementById("liveOddsMove")?.value||"normal";
+  const pressure=document.getElementById("livePressure")?.value||"mid";
+  const shots=document.getElementById("liveShots")?.value||"mid";
+  const cards=document.getElementById("liveCards")?.value||"none";
+  const subs=document.getElementById("liveSubs")?.value||"none";
+  const extra=(document.getElementById("hedgeSceneNote")?.value||"").trim();
+  const advice=[]; let risk=0;
+  if(pressure==="high" && shots==="high" && /^0-0/.test(score||"")){advice.push("强队围攻但没进球，可准备防平或后段下一球。");risk+=8;}
+  if(cards==="red"){advice.push("出现红牌，原剧本大概率失真，优先重新估值并考虑立即对冲。");risk+=15;}
+  if(cards==="yellow"){advice.push("黄牌偏多，节奏与犯规升高，留意点球/定位球/裁判尺度。");risk+=4;}
+  if(subs==="star_out"){advice.push("核心下场，原单逻辑可能减弱，可降低持仓或分批对冲。");risk+=10;}
   if(subs==="attack") advice.push("加强进攻，可关注后段大球/下一球。");
   if(subs==="defend") advice.push("保守换人，领先方收缩，波胆防一球差。");
   if(move==="reverse"){advice.push("盘口反跳，市场与场面可能不一致，慎重追单。");risk+=10;}
   if(move==="suspend"){advice.push("频繁封盘，可能有VAR/伤情/红牌信号，不急操作。");risk+=8;}
+  if(extra) advice.push("补充现场因素："+extra);
   if(!advice.length) advice.push("暂无强触发信号，按赛前计划执行。");
-  document.getElementById("liveResult").innerHTML=`<b>当前：${score}，${min}分钟</b><ul>${advice.map(x=>`<li>${x}</li>`).join("")}</ul><p>临场风险：${risk>=15?badge("高","red"):risk>=8?badge("中","orange"):badge("低","green")}</p>`;
+  document.getElementById("liveResult").innerHTML=`<b>当前：${score||'未填'}，${min||'-'}分钟</b><ul>${advice.map(x=>`<li>${x}</li>`).join("")}</ul><p>临场风险：${risk>=15?badge("高","red"):risk>=8?badge("中","orange"):badge("低","green")}</p>`;
 }
 
 function saveCurrentReview(){
@@ -1098,7 +1269,7 @@ function renderReviews(){
 }
 function exportReviews(){
   const blob=new Blob([localStorage.getItem(LS_REVIEW)||"[]"],{type:"application/json"});
-  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="football_model_v3_7_reviews.json";a.click();
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="football_model_v4_1reviews.json";a.click();
 }
 function clearReviews(){if(confirm("确定清空复盘？")){localStorage.removeItem(LS_REVIEW);renderReviews();}}
 function copyAnalysis(){
@@ -1136,12 +1307,59 @@ function renderModelNotes(){
 }
 function exportModelNotes(){
   const blob=new Blob([localStorage.getItem(LS_NOTES)||"[]"],{type:"application/json"});
-  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="football_model_v3_7_notes.json";a.click();
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="football_model_v4_1notes.json";a.click();
 }
 function clearModelNotes(){
   if(confirm("确定清空模型留言？")){localStorage.removeItem(LS_NOTES);renderModelNotes();}
 }
 
+
+function previewHedgeImage(e){
+  const file=e.target.files && e.target.files[0];
+  const img=document.getElementById("hedgePreview");
+  if(!file){ if(img) img.style.display="none"; return; }
+  const reader=new FileReader();
+  reader.onload=ev=>{ img.src=ev.target.result; img.style.display="block"; };
+  reader.readAsDataURL(file);
+}
+async function ocrHedgeSlip(){
+  const input=document.getElementById("hedgeImage");
+  const out=document.getElementById("hedgeSlipOcrText");
+  if(!input.files || !input.files[0]){ alert("请先上传原下注截图。"); return; }
+  if(!window.Tesseract){ alert("OCR库没有加载成功。你可以手动粘贴原下注文字。"); return; }
+  out.value="正在识别原下注截图，请稍等...";
+  try{
+    const result=await Tesseract.recognize(input.files[0],"eng+chi_sim",{logger:m=>{ if(m.status) out.value=`OCR处理中：${m.status} ${m.progress?Math.round(m.progress*100)+"%":""}`; }});
+    out.value=result.data.text||"";
+  }catch(e){
+    out.value="OCR识别失败："+e.message+"\n你也可以手动粘贴原下注内容。";
+  }
+}
+function parsePreBetSlipText(text){
+  const raw=(text||"").replace(/[Il|]/g,"1").replace(/[Oo]/g,"0");
+  const nums=(raw.match(/\d+(?:\.\d+)?/g)||[]).map(x=>parseFloat(x)).filter(x=>isFinite(x));
+  let stake="", odds="", prob="";
+  const oddsCand=nums.find(n=>n>=1.01 && n<=30);
+  if(oddsCand) odds=oddsCand;
+  const stakeCand=nums.filter(n=>n>=50).sort((a,b)=>b-a)[0];
+  if(stakeCand) stake=stakeCand;
+  const probCand=nums.find(n=>n>10 && n<95 && n!==stakeCand && n!==oddsCand);
+  if(probCand) prob=probCand;
+  let pick="";
+  const patterns=[/主胜|客胜|平局|让球[^\s,，;；]{0,12}|受让[^\s,，;；]{0,12}|大\s*\d+(?:\.\d+)?|小\s*\d+(?:\.\d+)?|主-\d+(?:\.\d+)?|客\+\d+(?:\.\d+)?/g,/home win|away win|draw|over\s*\d+(?:\.\d+)?|under\s*\d+(?:\.\d+)?/ig];
+  for(const p of patterns){ const m=raw.match(p); if(m && m[0]){ pick=m[0]; break; } }
+  return {pick, stake, odds, prob};
+}
+function parseHedgeSlipFields(){
+  const text=(document.getElementById("hedgeSlipOcrText").value||"").trim() || (document.getElementById("hedgeImgNote").value||"").trim();
+  if(!text){ alert("没有可识别的原下注文字。请先上传截图或手动写备注。"); return; }
+  const data=parsePreBetSlipText(text);
+  if(data.pick) document.getElementById("preBetPick").value=data.pick;
+  if(data.stake) document.getElementById("preBetStake").value=data.stake;
+  if(data.odds) document.getElementById("preBetOdds").value=data.odds;
+  if(data.prob) document.getElementById("preBetLiveProb").value=data.prob;
+  if(!data.pick && !data.stake && !data.odds) alert("已尝试解析，但识别不够稳定，请手动修正字段。");
+}
 
 /* V3.9 override: OCR + auto hedge weights */
 function initHedgeOptions(){
@@ -1271,6 +1489,7 @@ function calcHedge(){
   const prob=safeNum(document.getElementById("preBetLiveProb").value);
   const score=document.getElementById("hedgeScore").value.trim();
   const minute=safeNum(document.getElementById("hedgeMinute").value)||0;
+  const sceneNote=(document.getElementById("hedgeSceneNote")?.value||"").trim();
   const options=getHedgeOptions();
   if(!stake || !odds){
     document.getElementById("hedgeCalcResult").innerHTML="请先填写赛前买入本金和赔率。";
@@ -1360,6 +1579,8 @@ function calcHedge(){
   html+=`</tbody></table>`;
 
   const best=plans.slice().sort((a,b)=>b.weight-a.weight)[0];
+  if(sceneNote){ html+=`<p class="small">临场补充：${sceneNote}</p>`; }
+
   html+=`<h3>系统结论</h3><div class="hedgePlan best">
     <b>系统不是让你自己分比例。</b><br>
     已按当前赔率隐含概率 + 保护盘权重，自动给出每个方向的对冲权重和金额。<br>
@@ -1387,6 +1608,73 @@ function calcHedge(){
     time:new Date().toLocaleString()
   };
   document.getElementById("hedgeCalcResult").innerHTML=html;
+}
+
+
+function previewDutchImage(e){
+  const file=e.target.files && e.target.files[0];
+  const img=document.getElementById("dutchPreview");
+  if(!file){img.style.display="none";return;}
+  const reader=new FileReader();
+  reader.onload=ev=>{img.src=ev.target.result;img.style.display="block";};
+  reader.readAsDataURL(file);
+}
+async function ocrDutchImage(){
+  const input=document.getElementById("dutchImage");
+  const out=document.getElementById("dutchOcrText");
+  if(!input.files || !input.files[0]){
+    alert("请先上传波胆/冠军赔率截图。");
+    return;
+  }
+  if(!window.Tesseract){
+    alert("OCR库没有加载成功。你可以手动把盘口文字粘贴到文本框。");
+    return;
+  }
+  out.value="正在识别截图，请等一会儿...";
+  try{
+    const result=await Tesseract.recognize(input.files[0],"eng+chi_sim",{
+      logger:m=>{ if(m.status) out.value=`OCR处理中：${m.status} ${m.progress?Math.round(m.progress*100)+"%":""}`; }
+    });
+    out.value=result.data.text||"";
+  }catch(e){
+    out.value="OCR识别失败："+e.message+"\\n你可以手动把盘口文字粘贴到这里。";
+  }
+}
+function parseDutchPairs(text){
+  const lines=(text||"").split(/\\n+/).map(x=>x.trim()).filter(Boolean);
+  const rows=[];
+  const oddsRegex=/(\\d+(?:\\.\\d+)?)/g;
+  lines.forEach(line=>{
+    let clean=line.replace(/[Il|]/g,"1").replace(/[Oo]/g,"0").replace(/，/g,".").replace(/。/g,".");
+    const nums=[...clean.matchAll(oddsRegex)].map(m=>m[1]);
+    if(!nums.length)return;
+    let odds=null;
+    for(const s of nums.reverse()){
+      let n=parseFloat(s);
+      if(n>=100 && n<=999) n=n/100;
+      if(n>=1.01 && n<=80){odds=n;break;}
+    }
+    if(!odds)return;
+    let name=clean.replace(oddsRegex," ").replace(/\\s+/g," ").trim();
+    const scoreMatch=line.match(/\\b\\d{1,2}\\s*[-:]\\s*\\d{1,2}\\b/);
+    if(scoreMatch) name=scoreMatch[0].replace(":","-").replace(/\\s/g,"");
+    if(!name || name.length>30) name="";
+    rows.push({name,odds});
+  });
+  if(rows.length)return rows.slice(0,20);
+  const nums=extractOddsNumbers(text);
+  return nums.map((n,i)=>({name:`截图赔率${i+1}`,odds:n}));
+}
+function parseDutchOcrToRows(){
+  const text=document.getElementById("dutchOcrText").value;
+  const rows=parseDutchPairs(text);
+  if(!rows.length){
+    alert("没有识别到赔率。你可以手动输入。");
+    return;
+  }
+  const tb=document.querySelector("#dutchTable tbody");
+  tb.innerHTML="";
+  rows.forEach((r,i)=>addDutchRow(r.name||`截图赔率${i+1}`,fmt(r.odds), i<5?20:""));
 }
 
 </script>
