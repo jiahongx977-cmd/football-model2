@@ -1,6 +1,9 @@
 {
-  "name": "jax-ai-model-v4-2",
-  "version": "4.2.0",
+  "name": "jax-ai-model-v4-3-vercel-fixed",
+  "version": "4.3.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "engines": {
+    "node": "20.x"
+  }
 }
