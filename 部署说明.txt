@@ -1,23 +1,14 @@
-部署说明｜JAX的AI模型 V7.1 Dutching流程强化 + 触发来源精简版
+部署说明｜JAX的AI模型 V7.2 UI视觉统一优化版
 
 升级来源：
-从 V7.0 继续改，不是从旧版本改。
+从 V7.1 继续改，不是从旧版本改。
 
 上传方式：
 1. 解压 zip。
 2. 打开 GitHub 仓库：
    https://github.com/jiahongx977-cmd/football-model2
 3. 点击 Add file → Upload files。
-4. 上传解压后的全部文件：
-   - index.html
-   - package.json
-   - vercel.json
-   - api 文件夹
-   - .env.example
-   - README_部署说明.txt
-   - 部署说明.txt
-   - 文件清单_先看这个.txt
-   - 版本验证_先看这个.txt
+4. 上传解压后的全部文件，不要上传 zip 压缩包本身。
 5. 点击 Commit changes。
 6. 等待 Vercel 自动部署。
 

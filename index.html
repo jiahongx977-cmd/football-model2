@@ -147,7 +147,7 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
 </head>
 <body>
 <header><h1>JAX的AI模型</h1>
-<p>联网赔率 + 天气/战意/教练/阵容/体能/裁判因素 + 动态比分推演 + Dutching三模式 + 滚球对冲OCR + 赛后复盘｜V7.1</p>
+<p>联网赔率 + 天气/战意/教练/阵容/体能/裁判因素 + 动态比分推演 + Dutching三模式 + 滚球对冲OCR + 赛后复盘｜V7.2</p>
 </header>
 <div class="notice">
   使用说明：API Key 仍然只放在 Vercel 环境变量 <b>THE_ODDS_API_KEY</b> 中，朋友打开网站不需要自己填 Key。
@@ -189,7 +189,6 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
         <div class="quickbar">
           <button class="worldcup" onclick="quickLoad('soccer_fifa_world_cup','FIFA World Cup')">世界杯比赛</button>
           <button class="winner" onclick="quickLoad('soccer_fifa_world_cup_winner','FIFA World Cup Winner')">世界杯冠军赔率</button>
-          <button class="today" onclick="loadSoccerSports()">今日足球</button>
           <button class="league" onclick="quickLoad('soccer_uefa_champs_league','UEFA Champions League')">欧冠</button>
           <button class="league" onclick="quickLoad('soccer_epl','English Premier League')">英超</button>
           <button class="league" onclick="quickLoad('soccer_spain_la_liga','La Liga')">西甲</button>
@@ -771,7 +770,7 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
       </div>
 </section>
 </main>
-<footer>JAX的AI模型｜V7.1 Dutching流程强化 + 触发来源精简版｜预算高亮、按钮顺序优化、触发来源动态精简。</footer>
+<footer>JAX的AI模型｜V7.2 UI视觉统一优化版｜快捷入口精简、主按钮统一、预算与分配方式橙色描边。</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js">
 function previewDutchImage(e){
@@ -8509,7 +8508,7 @@ document.addEventListener("DOMContentLoaded", function(){
 </script>
 <script>
 
-/* V7.1 inherited duplicate review panel cleanup
+/* V7.2 inherited duplicate review panel cleanup
    只保留 新版复盘模块 v66ReviewPanel。
    隐藏旧版“赛后复盘历史记录”模块，避免页面出现两个重复区域。
 */
@@ -8617,7 +8616,7 @@ document.addEventListener("DOMContentLoaded", function(){
 
 <script>
 
-/* V7.1 dynamic scoreline engine + Dutching button order
+/* V7.2 dynamic scoreline engine + Dutching button order
    1. 本场波胆推荐不再使用固定模板，而是根据每场比赛的赔率结构、隐含概率、强弱关系、天气、教练、阵容、体能、裁判、盘口热度等重新推演。
    2. 不强制每场比赛必须不同；若两场比赛模型输入高度相似，结果可以相似，但必须由模型计算得出。
    3. API赔率显示平均赔率、隐含概率和盘口倾向。
@@ -8920,7 +8919,7 @@ document.addEventListener("DOMContentLoaded", function(){
         保护比分：<b>${rows[1]?.score||"-"}</b>、<b>${rows[2]?.score||"-"}</b>。
         下方波胆池由赔率结构与当前输入项动态生成，不再使用固定模板。
       </div>
-      <p class="small">V7.1 操作流程与盘口中文解释已执行：${new Date().toLocaleTimeString()}</p>
+      <p class="small">V7.2 操作流程与盘口中文解释已执行：${new Date().toLocaleTimeString()}</p>
     `;
   }
 
@@ -9020,7 +9019,7 @@ document.addEventListener("DOMContentLoaded", function(){
 
 
 <style>
-/* V7.1 首页流程优化 */
+/* V7.2 首页流程优化 */
 #online > .grid{display:block !important}
 #online > .grid > .card{width:100%;margin-bottom:18px}
 #matchList.v69MatchList{max-height:360px;overflow-y:auto;padding-right:8px}
@@ -9035,7 +9034,7 @@ document.addEventListener("DOMContentLoaded", function(){
 </style>
 <script>
 
-/* V7.1 flow UI + Chinese odds explanation
+/* V7.2 flow UI + Chinese odds explanation
    1. 首页改为：联网设置在上，近期比赛在下。
    2. 近期比赛固定高度滚动，不撑长页面。
    3. 近期比赛英文队名增加中文翻译。
@@ -9371,7 +9370,7 @@ document.addEventListener("DOMContentLoaded", function(){
 
 
 <style>
-/* V7.1: scoreline hierarchy + Dutching 3 modes */
+/* V7.2: scoreline hierarchy + Dutching 3 modes */
 .v70-mode-wrap{
   display:flex;align-items:center;gap:8px;flex-wrap:wrap;
   background:#fff7ed;border:2px solid #fb923c;border-radius:16px;
@@ -9389,7 +9388,7 @@ document.addEventListener("DOMContentLoaded", function(){
 .v70-mode-note{font-size:13px;color:#475569;line-height:1.65;margin-top:8px}
 </style>
 <script>
-/* V7.1 波胆动态推演 + Dutching三模式高亮版 */
+/* V7.2 波胆动态推演 + Dutching三模式高亮版 */
 (function(){
   function el(id){ return document.getElementById(id); }
   function num(v){ const n=parseFloat(String(v||"").replace(/[^\d.\-]/g,"")); return isFinite(n)?n:0; }
@@ -9669,7 +9668,7 @@ document.addEventListener("DOMContentLoaded", function(){
       </ul>
       <h3>当前主线</h3>
       <div class="result-box">当前主线比分：<b>${rows[0]?.score||"-"}</b>；保护比分：<b>${rows[1]?.score||"-"}</b>、<b>${rows[2]?.score||"-"}</b>。下方波胆池由赔率结构与当前输入项动态生成。</div>
-      <p class="small">V7.1 波胆权重离散推演已执行：${new Date().toLocaleTimeString()}</p>
+      <p class="small">V7.2 波胆权重离散推演已执行：${new Date().toLocaleTimeString()}</p>
     `;
   }
   window.jaxStableAnalyze=function(){
@@ -9885,7 +9884,7 @@ document.addEventListener("DOMContentLoaded", function(){
 
 
 <style>
-/* V7.1: budget highlight + cleaner trigger source + button flow */
+/* V7.2: budget highlight + cleaner trigger source + button flow */
 .v71-budget-wrap{
   background:#fff7ed;border:2px solid #fb923c;border-radius:16px;
   padding:10px 12px;box-shadow:0 6px 16px rgba(249,115,22,.10)
@@ -9902,7 +9901,7 @@ document.addEventListener("DOMContentLoaded", function(){
 .v71-trigger-table .v70-source-tag{margin:2px 4px 2px 0}
 </style>
 <script>
-/* V7.1 Dutching流程强化 + 触发来源精简版 */
+/* V7.2 Dutching流程强化 + 触发来源精简版 */
 (function(){
   function el(id){return document.getElementById(id);}
   function clamp(n,a,b){return Math.max(a,Math.min(b,n));}
@@ -10090,6 +10089,235 @@ document.addEventListener("DOMContentLoaded", function(){
   setTimeout(bindV71,300);
   setTimeout(bindV71,1000);
   setTimeout(bindV71,2000);
+})();
+</script>
+
+
+<style>
+/* V7.2 UI视觉统一优化版 */
+:root{--jax-red:#dc2626;--jax-orange:#f97316;--jax-orange-bg:#fff7ed;}
+
+/* 快捷入口精简后，剩余入口尽量一排展示 */
+.quickbar{
+  display:flex!important;
+  flex-wrap:wrap!important;
+  gap:10px!important;
+  align-items:center!important;
+  margin:12px 0 14px!important;
+}
+.quickbar button{
+  min-width:132px!important;
+  height:42px!important;
+  border-radius:12px!important;
+  font-weight:900!important;
+  font-size:14px!important;
+  padding:0 18px!important;
+}
+.quickbar .today{display:none!important}
+.quickbar .worldcup{background:#f97316!important;color:#fff!important}
+.quickbar .winner{background:#d97706!important;color:#fff!important}
+
+/* 全站红色主按钮统一：只要是关键操作，都同一大小、同一红色 */
+.btn.v72-main-red,
+.btn.v71-red-action,
+.btn.v70-main-red,
+.btn.v69-red-action,
+button.v71-red-action,
+button.v69-red-action{
+  background:var(--jax-red)!important;
+  border:1px solid var(--jax-red)!important;
+  color:#fff!important;
+  min-height:46px!important;
+  min-width:150px!important;
+  padding:12px 20px!important;
+  border-radius:16px!important;
+  font-size:15px!important;
+  font-weight:900!important;
+  box-shadow:0 8px 18px rgba(220,38,38,.18)!important;
+  line-height:1.2!important;
+}
+
+/* 获取近期比赛也改成红色主按钮 */
+#v72FetchOddsBtn,
+button[onclick="fetchOdds()"]{
+  background:var(--jax-red)!important;
+  border-color:var(--jax-red)!important;
+  color:#fff!important;
+  min-height:46px!important;
+  min-width:150px!important;
+  padding:12px 20px!important;
+  border-radius:16px!important;
+  font-size:15px!important;
+  font-weight:900!important;
+  box-shadow:0 8px 18px rgba(220,38,38,.18)!important;
+}
+
+/* 预算与分配方式：不要大面积高亮，只保留橙色描边 */
+.v71-budget-wrap{
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  padding:0!important;
+}
+.v71-budget-wrap label{
+  color:#9a3412!important;
+  font-weight:900!important;
+}
+.v71-budget-wrap input,
+#dutchBank,
+#inlineDutchBank{
+  border:2px solid var(--jax-orange)!important;
+  border-radius:12px!important;
+  background:#fff!important;
+  font-weight:800!important;
+}
+.v71-budget-help{
+  color:#9a3412!important;
+  background:transparent!important;
+  margin-top:6px!important;
+}
+
+/* 分配方式同样只做橙色描边，不做大面积底色 */
+.v70-mode-wrap{
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  padding:0!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:stretch!important;
+  gap:6px!important;
+}
+.v70-mode-wrap label{
+  color:#9a3412!important;
+  font-weight:900!important;
+}
+.v70-mode-select,
+#jaxDutchMode,
+#inlineDutchMode{
+  border:2px solid var(--jax-orange)!important;
+  border-radius:12px!important;
+  background:#fff!important;
+  font-weight:900!important;
+  min-height:42px!important;
+}
+.v70-mode-help{
+  color:#9a3412!important;
+  font-size:12px!important;
+  line-height:1.55!important;
+}
+
+/* 主 Dutching 区不要被整块染色，只保留普通白底卡片 */
+#dutch.card,
+#dutch .card{
+  background:#fff!important;
+}
+#dutch input,
+#dutch select{
+  box-shadow:none!important;
+}
+
+/* Dutching总页操作流保持纵向，但视觉更干净 */
+.v71-dutch-flow{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:flex-start!important;
+  gap:12px!important;
+  margin:14px 0!important;
+}
+.v71-dutch-flow .v70-mode-wrap{
+  width:min(760px,100%)!important;
+}
+
+/* 本场快捷区按钮在表格下方，统一红色 */
+.v71-action-panel{
+  display:flex!important;
+  gap:12px!important;
+  flex-wrap:wrap!important;
+  align-items:center!important;
+  margin:14px 0 8px!important;
+}
+.v71-action-panel button{
+  background:var(--jax-red)!important;
+  border:1px solid var(--jax-red)!important;
+  color:#fff!important;
+  min-height:46px!important;
+  min-width:150px!important;
+  padding:12px 20px!important;
+  border-radius:16px!important;
+  font-size:15px!important;
+  font-weight:900!important;
+  box-shadow:0 8px 18px rgba(220,38,38,.18)!important;
+}
+</style>
+<script>
+/* V7.2 UI视觉统一优化版 */
+(function(){
+  function el(id){return document.getElementById(id);}
+
+  function v72ApplyUI(){
+    // 隐藏已删除的无效快捷入口
+    document.querySelectorAll(".quickbar .today, button.today").forEach(b=>b.style.display="none");
+
+    // 世界杯比赛按钮改橙色
+    document.querySelectorAll(".quickbar .worldcup").forEach(b=>{
+      b.style.background="#f97316";
+      b.style.color="#fff";
+    });
+
+    // 获取近期比赛变红色主按钮
+    document.querySelectorAll('button[onclick="fetchOdds()"]').forEach(b=>{
+      b.id=b.id||"v72FetchOddsBtn";
+      b.classList.remove("blue","green","orange","primary");
+      b.classList.add("v72-main-red");
+    });
+
+    // 所有已经标记为红色主操作的按钮统一
+    document.querySelectorAll(".v71-red-action,.v69-red-action").forEach(b=>{
+      b.classList.add("v72-main-red");
+    });
+
+    // 预算输入只保留橙色描边，不大面积高亮
+    ["dutchBank","inlineDutchBank"].forEach(id=>{
+      const inp=el(id);
+      if(inp){
+        inp.style.border="2px solid #f97316";
+        inp.style.borderRadius="12px";
+        inp.style.background="#fff";
+        inp.style.fontWeight="800";
+        const wrap=inp.closest(".v71-budget-wrap");
+        if(wrap){
+          wrap.style.background="transparent";
+          wrap.style.border="0";
+          wrap.style.boxShadow="none";
+          wrap.style.padding="0";
+        }
+      }
+    });
+
+    // 分配方式只保留橙色描边
+    ["jaxDutchMode","inlineDutchMode"].forEach(id=>{
+      const s=el(id);
+      if(s){
+        s.style.border="2px solid #f97316";
+        s.style.borderRadius="12px";
+        s.style.background="#fff";
+        s.style.fontWeight="900";
+      }
+      const wrap=s&&s.closest(".v70-mode-wrap");
+      if(wrap){
+        wrap.style.background="transparent";
+        wrap.style.border="0";
+        wrap.style.boxShadow="none";
+        wrap.style.padding="0";
+      }
+    });
+  }
+
+  window.addEventListener("DOMContentLoaded",v72ApplyUI);
+  setTimeout(v72ApplyUI,300);
+  setTimeout(v72ApplyUI,1000);
+  setTimeout(v72ApplyUI,2000);
 })();
 </script>
 
