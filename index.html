@@ -147,7 +147,7 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
 </head>
 <body>
 <header><h1>JAX的AI模型</h1>
-<p>联网赔率 + 天气/战意/教练/阵容/体能/裁判因素 + 模型比分池 + Dutching + 滚球对冲OCR + 赛后复盘｜V6.7</p>
+<p>联网赔率 + 天气/战意/教练/阵容/体能/裁判因素 + 动态比分推演 + Dutching + 滚球对冲OCR + 赛后复盘｜V6.8</p>
 </header>
 <div class="notice">
   使用说明：API Key 仍然只放在 Vercel 环境变量 <b>THE_ODDS_API_KEY</b> 中，朋友打开网站不需要自己填 Key。
@@ -617,8 +617,8 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
       </table>
       <div class="flex">
         <button class="btn" onclick="addDutchRow()">添加一行</button>
-        <button class="btn primary" onclick="calcDutch()">计算 Dutching + ROI</button>
         <button class="btn orange" onclick="fillDutchFromScorelines()">AI计算权重</button>
+        <button class="btn primary" onclick="calcDutch()">计算 Dutching + ROI</button>
       </div>
       <div id="dutchResult" class="result-box">等待计算。</div>
     </div>
@@ -771,7 +771,7 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
       </div>
 </section>
 </main>
-<footer>JAX的AI模型｜V6.7 复盘重复模块清理版｜只保留新版复盘历史模块，隐藏旧版重复区域。</footer>
+<footer>JAX的AI模型｜V6.8 动态比分推演修正版｜赔率与多因素真实推演比分池，Dutching按钮顺序优化。</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js">
 function previewDutchImage(e){
@@ -8614,5 +8614,409 @@ document.addEventListener("DOMContentLoaded", function(){
 })();
 
 </script>
+
+<script>
+
+/* V6.8 dynamic scoreline engine + Dutching button order
+   1. 本场波胆推荐不再使用固定模板，而是根据每场比赛的赔率结构、隐含概率、强弱关系、天气、教练、阵容、体能、裁判、盘口热度等重新推演。
+   2. 不强制每场比赛必须不同；若两场比赛模型输入高度相似，结果可以相似，但必须由模型计算得出。
+   3. API赔率显示平均赔率、隐含概率和盘口倾向。
+   4. Dutching总页按钮顺序调整：添加一行 → AI计算权重 → 计算 Dutching + ROI。
+*/
+(function(){
+  function el(id){ return document.getElementById(id); }
+  function val(id){ const x=el(id); return x ? String(x.value || x.innerText || "").trim() : ""; }
+  function textOf(id){
+    const x=el(id);
+    if(!x) return "";
+    if(x.tagName==="SELECT" && x.selectedOptions && x.selectedOptions[0]) return x.selectedOptions[0].textContent.trim();
+    return val(id);
+  }
+  function num(v){ const n=parseFloat(v); return isFinite(n)?n:0; }
+  function fmt(n){ return isFinite(n) ? Number(n).toFixed(2) : "-"; }
+  function pct(n){ return isFinite(n) ? Number(n).toFixed(1)+"%" : "-"; }
+  function clamp(n,a,b){ return Math.max(a,Math.min(b,n)); }
+  function avg(arr){ arr=(arr||[]).filter(x=>isFinite(x)); return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : NaN; }
+  function poisson(k, lambda){
+    let f=1; for(let i=2;i<=k;i++) f*=i;
+    return Math.exp(-lambda) * Math.pow(lambda,k) / f;
+  }
+  function safeEvent(){
+    try{
+      if(typeof selectedEvent !== "undefined" && selectedEvent) return selectedEvent;
+    }catch(e){}
+    if(window.selectedEvent) return window.selectedEvent;
+    return null;
+  }
+  function collectMarkets68(ev){
+    const out={h2h:[],totals:[],spreads:[]};
+    if(!ev || !ev.bookmakers) return out;
+    (ev.bookmakers||[]).forEach(b=>(b.markets||[]).forEach(m=>{
+      if(out[m.key]) out[m.key].push({book:b.title, outcomes:m.outcomes||[]});
+    }));
+    return out;
+  }
+  function getH2H68(ev){
+    const ret={home:[],draw:[],away:[]};
+    const m=collectMarkets68(ev).h2h;
+    m.forEach(mm=>(mm.outcomes||[]).forEach(o=>{
+      if(o.name===ev.home_team) ret.home.push(Number(o.price));
+      else if(String(o.name).toLowerCase()==="draw") ret.draw.push(Number(o.price));
+      else if(o.name===ev.away_team) ret.away.push(Number(o.price));
+    }));
+    const h=avg(ret.home), d=avg(ret.draw), a=avg(ret.away);
+    const ih=h>1?1/h:0, id=d>1?1/d:0, ia=a>1?1/a:0;
+    const sum=ih+id+ia;
+    return {
+      homeOdds:h, drawOdds:d, awayOdds:a,
+      homeRaw:ret.home, drawRaw:ret.draw, awayRaw:ret.away,
+      homeP:sum?ih/sum*100:33.5,
+      drawP:sum?id/sum*100:29,
+      awayP:sum?ia/sum*100:33.5,
+      overround:sum?sum*100:NaN,
+      books:Math.max(ret.home.length,ret.draw.length,ret.away.length)
+    };
+  }
+  function getTotals68(ev){
+    const rows=[];
+    collectMarkets68(ev).totals.forEach(mm=>(mm.outcomes||[]).forEach(o=>rows.push(o)));
+    const overs=rows.filter(o=>String(o.name).toLowerCase()==="over");
+    const unders=rows.filter(o=>String(o.name).toLowerCase()==="under");
+    const line=avg(overs.map(o=>Number(o.point)).filter(isFinite));
+    const over=avg(overs.map(o=>Number(o.price)).filter(isFinite));
+    const under=avg(unders.map(o=>Number(o.price)).filter(isFinite));
+    let overP=50, underP=50;
+    if(over>1 && under>1){
+      const io=1/over, iu=1/under, s=io+iu;
+      overP=io/s*100; underP=iu/s*100;
+    }
+    return {line:isFinite(line)?line:2.35, over, under, overP, underP};
+  }
+  function getInputs68(){
+    return {
+      matchType:val("matchType"),
+      matchTypeText:textOf("matchType"),
+      powerGap:val("powerGap"),
+      powerGapText:textOf("powerGap"),
+      marketHeat:val("marketHeat"),
+      marketHeatText:textOf("marketHeat"),
+      weather:val("weatherImpact"),
+      weatherText:textOf("weatherImpact"),
+      coach:val("coachIntent"),
+      coachText:textOf("coachIntent"),
+      lineup:val("lineupState"),
+      lineupText:textOf("lineupState"),
+      fatigue:val("fatigue"),
+      fatigueText:textOf("fatigue"),
+      refStrict:val("refStrict"),
+      refStrictText:textOf("refStrict"),
+      refRelation:val("refRelation"),
+      refRelationText:textOf("refRelation"),
+      cardRisk:val("cardRisk"),
+      cardRiskText:textOf("cardRisk"),
+      varRisk:val("varRisk"),
+      varRiskText:textOf("varRisk"),
+      homeManual:num(val("modelHomeP")),
+      drawManual:num(val("modelDrawP")),
+      awayManual:num(val("modelAwayP"))
+    };
+  }
+  function adjustments68(input){
+    let totalAdj=0, drawAdj=0, homeAdj=0, awayAdj=0, varAdj=0, risk=0;
+    const reasons=[];
+    const lowGoalReasons=[];
+    const highGoalReasons=[];
+
+    if(input.weather==="rain"){ totalAdj-=0.28; drawAdj+=2; risk+=3; lowGoalReasons.push("雨战降低传控与射门质量"); }
+    if(input.weather==="wind"){ totalAdj-=0.22; drawAdj+=1.5; risk+=3; lowGoalReasons.push("大风影响传中、长传和定位球落点"); }
+    if(input.weather==="heat"||input.weather==="humid"||input.weather==="altitude"){ totalAdj-=0.18; drawAdj+=1; risk+=4; lowGoalReasons.push("高温/湿热/海拔可能降低比赛节奏"); }
+
+    if(input.coach==="full_attack"||input.coach==="must_win"){ totalAdj+=0.25; risk+=2; highGoalReasons.push("教练目标偏进攻/抢分"); }
+    if(input.coach==="control"){ totalAdj-=0.25; drawAdj+=3; lowGoalReasons.push("教练可能控分或保守处理"); }
+    if(input.coach==="rotate"){ totalAdj-=0.12; risk+=4; lowGoalReasons.push("轮换保护主力，进攻连续性下降"); }
+
+    if(input.lineup==="strong"){ totalAdj+=0.08; reasons.push("阵容主力齐整，进攻稳定性略升"); }
+    if(input.lineup==="injury"){ totalAdj-=0.18; risk+=4; lowGoalReasons.push("关键伤停降低进攻质量"); }
+    if(input.lineup==="rotated"||input.lineup==="young"){ totalAdj-=0.10; risk+=4; reasons.push("轮换/实验阵增加不确定性"); }
+
+    if(input.fatigue==="travel"||input.fatigue==="short_rest"){ totalAdj-=0.15; drawAdj+=1.5; risk+=3; lowGoalReasons.push("旅途或休息不足，后程降速"); }
+    if(input.fatigue==="advantage"){ totalAdj+=0.08; reasons.push("体能占优，后程压制力略升"); }
+
+    if(input.matchType==="worldcup_knockout"){ totalAdj-=0.22; drawAdj+=2.5; lowGoalReasons.push("淘汰赛容错低，常规时间更谨慎"); }
+    if(input.matchType==="friendly"){ totalAdj+=0.12; risk+=4; reasons.push("友谊赛换人多，后段不确定性更高"); }
+
+    if(input.marketHeat==="hot_fav"){ drawAdj+=2.5; risk+=4; reasons.push("热门过热，防平和一球小胜权重上调"); }
+    if(input.marketHeat==="cold_pull"){ drawAdj+=1.8; risk+=3; reasons.push("冷门有拉力，增加平局/弱势方小胜保护"); }
+    if(input.marketHeat==="confusing"){ drawAdj+=1.5; risk+=6; reasons.push("盘口混乱，降低单边判断置信度"); }
+
+    if(input.refStrict==="strict"){ totalAdj+=0.08; varAdj+=1; risk+=4; highGoalReasons.push("裁判严格，牌和定位球改变局面的概率上升"); }
+    if(input.refStrict==="loose"){ totalAdj-=0.10; drawAdj+=1; lowGoalReasons.push("裁判宽松，弱队身体对抗收益上升"); }
+    if(input.refStrict==="penalty_var"){ totalAdj+=0.28; varAdj+=4; risk+=5; highGoalReasons.push("点球/VAR倾向高，2-1、2-2等爆点比分上调"); }
+    if(input.cardRisk==="high"||input.cardRisk==="derby"){ totalAdj+=0.18; varAdj+=3; risk+=5; highGoalReasons.push("红黄牌风险高，比赛结构可能被打破"); }
+    if(input.varRisk==="high"){ totalAdj+=0.18; varAdj+=3; risk+=4; highGoalReasons.push("VAR/点球风险高，进球和反转概率上升"); }
+    if(input.refRelation==="controversy"||input.refRelation==="region_sensitive"){ risk+=5; reasons.push("裁判历史/地区敏感带来额外不确定性"); }
+
+    return {totalAdj, drawAdj, homeAdj, awayAdj, varAdj, risk, reasons, lowGoalReasons, highGoalReasons};
+  }
+  function buildDynamicScorelines68(){
+    const ev=safeEvent();
+    const input=getInputs68();
+    const h2h=getH2H68(ev||{home_team:"主队",away_team:"客队",bookmakers:[]});
+    const totals=getTotals68(ev||{bookmakers:[]});
+
+    let homeP=input.homeManual || h2h.homeP;
+    let drawP=input.drawManual || h2h.drawP;
+    let awayP=input.awayManual || h2h.awayP;
+
+    // 人工强弱关系是补充修正，不覆盖赔率。
+    if(input.powerGap==="favorite_small"){
+      if(homeP>=awayP){homeP+=3; awayP-=2;} else {awayP+=3; homeP-=2;}
+    }
+    if(input.powerGap==="favorite_big"){
+      if(homeP>=awayP){homeP+=6; awayP-=4;} else {awayP+=6; homeP-=4;}
+    }
+    if(input.powerGap==="mismatch"){
+      if(homeP>=awayP){homeP+=9; awayP-=6;} else {awayP+=9; homeP-=6;}
+    }
+    if(input.powerGap==="balanced"){ drawP+=1.5; }
+
+    const adj=adjustments68(input);
+    drawP += adj.drawAdj;
+
+    let s=homeP+drawP+awayP;
+    homeP=homeP/s*100; drawP=drawP/s*100; awayP=awayP/s*100;
+
+    const diff=(homeP-awayP)/100;
+    let totalGoals = (isFinite(totals.line) && totals.line>1) ? totals.line : 2.35;
+    if(totals.overP>54) totalGoals+=0.18;
+    if(totals.underP>54) totalGoals-=0.18;
+    totalGoals += adj.totalAdj;
+    totalGoals = clamp(totalGoals, 1.55, 3.45);
+
+    let homeXG = totalGoals/2 + diff*0.95 + 0.08; // 主场/名义主队微优势
+    let awayXG = totalGoals - homeXG;
+    if(input.lineup==="injury"){
+      if(homeP>=awayP) homeXG-=0.12; else awayXG-=0.12;
+    }
+    if(input.fatigue==="travel"||input.fatigue==="short_rest"){
+      if(homeP>=awayP) homeXG-=0.06; else awayXG-=0.06;
+    }
+    homeXG=clamp(homeXG,0.30,3.10);
+    awayXG=clamp(awayXG,0.25,3.00);
+
+    const scoreProbs=[];
+    for(let hg=0; hg<=4; hg++){
+      for(let ag=0; ag<=4; ag++){
+        let p=poisson(hg,homeXG)*poisson(ag,awayXG);
+        const total=hg+ag;
+        if(hg===ag) p*=1+drawP/130;
+        if(total<=1 && (adj.lowGoalReasons.length || totals.underP>54)) p*=1.18;
+        if(total>=3 && (adj.highGoalReasons.length || totals.overP>54 || adj.varAdj>2)) p*=1.18;
+        if(total>=4 && (adj.highGoalReasons.length || adj.varAdj>3)) p*=1.12;
+        if(input.marketHeat==="hot_fav" && Math.abs(hg-ag)<=1) p*=1.10;
+        if(input.powerGap==="mismatch" && Math.abs(hg-ag)>=2) p*=1.10;
+        scoreProbs.push({score:hg+"-"+ag,hg,ag,p,total});
+      }
+    }
+    scoreProbs.sort((a,b)=>b.p-a.p);
+
+    function pick(cond){
+      const idx=scoreProbs.findIndex(x=>cond(x) && !chosen.some(c=>c.score===x.score));
+      if(idx>=0) return scoreProbs[idx];
+      return scoreProbs.find(x=>!chosen.some(c=>c.score===x.score));
+    }
+    const homeFav=homeP>=awayP;
+    const chosen=[];
+    function add(scene, cond, note, use){
+      const x=pick(cond);
+      if(!x) return;
+      chosen.push({scene, score:x.score, raw:x.p, note, use:use||scene});
+    }
+
+    add("主剧本", x=> homeFav ? x.hg>x.ag : x.ag>x.hg,
+      homeFav ? "赔率/模型概率更支持主队方向，作为主线比分。" : "赔率/模型概率更支持客队方向，作为主线比分。",
+      "主仓候选");
+
+    add("平局保护", x=>x.hg===x.ag,
+      "平局概率、比赛性质或盘口热度提示需要防平。",
+      "保护候选");
+
+    add("一球差保护", x=>Math.abs(x.hg-x.ag)===1 && (homeFav?x.hg>x.ag:x.ag>x.hg),
+      "强势方优势存在，但世界杯比赛常见一球差结束。",
+      "二仓候选");
+
+    add("低比分保护", x=>x.total<=1,
+      "天气、体能、教练或小球倾向会压低总进球。",
+      "防守保护");
+
+    add("反向/冷门", x=> homeFav ? x.ag>x.hg : x.hg>x.ag,
+      "热门过热、红牌、VAR、阵容或临场波动下保留反向分支。",
+      "冷门小仓");
+
+    add("爆点剧本", x=>x.total>=3,
+      "早进球、点球、红牌或大球结构出现时，比分可能被打开。",
+      "爆点小仓");
+
+    let totalRaw=chosen.reduce((a,b)=>a+b.raw,0)||1;
+    let rows=chosen.map(x=>Object.assign({},x,{weight:Math.max(6,Math.round(x.raw/totalRaw*100))}));
+    let tw=rows.reduce((a,b)=>a+b.weight,0)||1;
+    rows=rows.map(x=>Object.assign({},x,{weight:Math.round(x.weight/tw*100)}));
+    // 修正四舍五入误差
+    let diffW=100-rows.reduce((a,b)=>a+b.weight,0);
+    if(rows[0]) rows[0].weight+=diffW;
+
+    const summary={
+      event:ev,
+      input,h2h,totals,homeP,drawP,awayP,homeXG,awayXG,totalGoals,adj,
+      dataQuality: (h2h.books && isFinite(h2h.homeOdds) && isFinite(h2h.drawOdds) && isFinite(h2h.awayOdds)) ? "API赔率已参与动态推演" : "当前赔率/资料不足，以下为保守推演，不是完整动态模型结果"
+    };
+    rows.summary68=summary;
+
+    try{ currentScorelines=rows; }catch(e){}
+    window.currentScorelines=rows;
+    window.JAX_SCORELINES=rows;
+    window.JAX_SCORELINE_SUMMARY_V68=summary;
+    return rows;
+  }
+
+  function renderDynamicAnalysis68(rows){
+    const box=el("analysisResult");
+    if(!box) return;
+    const s=rows.summary68 || {};
+    const ev=s.event || {};
+    const match=(ev.home_team&&ev.away_team)?(ev.home_team+" vs "+ev.away_team):(typeof jaxDetectSelectedMatch==="function"?jaxDetectSelectedMatch():"已选比赛");
+    const h=s.h2h||{}, t=s.totals||{}, input=s.input||{}, adj=s.adj||{reasons:[],lowGoalReasons:[],highGoalReasons:[]};
+    const allReasons=[].concat(adj.reasons||[],adj.lowGoalReasons||[],adj.highGoalReasons||[]);
+    const reasonText=allReasons.length ? allReasons.slice(0,6).map(x=>"<li>"+x+"</li>").join("") : "<li>当前主要由胜平负赔率、隐含概率和基础世界杯模型生成。</li>";
+    const marketText = `
+      <table>
+        <thead><tr><th>项目</th><th>平均赔率</th><th>隐含/模型概率</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>主胜</td><td>${fmt(h.homeOdds)}</td><td>${pct(s.homeP)}</td><td>${ev.home_team||"主队"}</td></tr>
+          <tr><td>平局</td><td>${fmt(h.drawOdds)}</td><td>${pct(s.drawP)}</td><td>防平参考</td></tr>
+          <tr><td>客胜</td><td>${fmt(h.awayOdds)}</td><td>${pct(s.awayP)}</td><td>${ev.away_team||"客队"}</td></tr>
+          <tr><td>大小球</td><td>${isFinite(t.line)?fmt(t.line):"-"}</td><td>大 ${pct(t.overP)} / 小 ${pct(t.underP)}</td><td>总进球模型约 ${fmt(s.totalGoals)}</td></tr>
+        </tbody>
+      </table>`;
+
+    box.innerHTML = `
+      <h3>完整模型分析结果</h3>
+      <p><b>${match}</b></p>
+      <div class="notice" style="padding:10px;margin:10px 0">${s.dataQuality||""}</div>
+      <h3>API赔率明细 / 自动带入模型</h3>
+      ${marketText}
+      <h3>模型输入修正</h3>
+      <ul>
+        <li>比赛性质：${input.matchTypeText||"-"}；强弱关系：${input.powerGapText||"-"}；盘口热度：${input.marketHeatText||"-"}。</li>
+        <li>天气：${input.weatherText||"-"}；教练：${input.coachText||"-"}；阵容：${input.lineupText||"-"}；体能：${input.fatigueText||"-"}。</li>
+        <li>裁判：${input.refStrictText||"-"} / ${input.refRelationText||"-"} / ${input.cardRiskText||"-"} / ${input.varRiskText||"-"}。</li>
+        <li>预估进球：${ev.home_team||"主队"} ${fmt(s.homeXG)}，${ev.away_team||"客队"} ${fmt(s.awayXG)}。</li>
+      </ul>
+      <h3>为什么推这些比分</h3>
+      <ul>${reasonText}</ul>
+      <h3>当前主线</h3>
+      <div class="result-box">
+        当前主线比分：<b>${rows[0]?.score||"-"}</b>；
+        保护比分：<b>${rows[1]?.score||"-"}</b>、<b>${rows[2]?.score||"-"}</b>。
+        下方波胆池由赔率结构与当前输入项动态生成，不再使用固定模板。
+      </div>
+      <p class="small">V6.8 动态比分推演已执行：${new Date().toLocaleTimeString()}</p>
+    `;
+  }
+
+  function renderScoreTable68(rows){
+    const tb=document.querySelector("#modelScoreTable tbody");
+    if(!tb) return;
+    tb.innerHTML=rows.map((s,i)=>`
+      <tr>
+        <td>${i+1}</td>
+        <td>${s.scene}</td>
+        <td><b>${s.score}</b></td>
+        <td>${s.weight}%<div class="scorebar"><span style="width:${s.weight}%"></span></div></td>
+        <td>${s.use||""}</td>
+        <td>${s.note||""}</td>
+      </tr>`).join("");
+  }
+
+  function renderInlineDutch68(rows){
+    if(typeof jaxRenderInlineDutch==="function"){
+      jaxRenderInlineDutch(rows);
+    }else if(typeof generateInlineDutchFromModel==="function"){
+      generateInlineDutchFromModel();
+    }
+  }
+
+  window.jaxBuildScorelines = buildDynamicScorelines68;
+  window.jaxStableAnalyze = function(){
+    const ev=safeEvent();
+    const match=(ev&&ev.home_team&&ev.away_team)?(ev.home_team+" vs "+ev.away_team):(typeof jaxDetectSelectedMatch==="function"?jaxDetectSelectedMatch():"");
+    if(!match){
+      const box=el("analysisResult");
+      if(box) box.innerHTML="请先在右侧近期比赛里点选一场比赛。";
+      return false;
+    }
+    const rows=buildDynamicScorelines68();
+    renderDynamicAnalysis68(rows);
+    renderScoreTable68(rows);
+    renderInlineDutch68(rows);
+    return false;
+  };
+
+  function reorderDutchButtons68(){
+    const tables=[document.getElementById("dutchTable")].filter(Boolean);
+    tables.forEach(table=>{
+      const flex=table.parentElement ? table.parentElement.querySelector(".flex") : null;
+      if(!flex || flex.dataset.v68Reordered) return;
+      const buttons=Array.from(flex.querySelectorAll("button"));
+      const add=buttons.find(b=>(b.innerText||"").includes("添加一行"));
+      const ai=buttons.find(b=>(b.innerText||"").includes("AI计算权重"));
+      const calc=buttons.find(b=>(b.innerText||"").includes("计算 Dutching"));
+      if(add && ai && calc){
+        flex.innerHTML="";
+        flex.appendChild(add);
+        flex.appendChild(ai);
+        flex.appendChild(calc);
+        flex.dataset.v68Reordered="1";
+      }
+    });
+  }
+
+  function bindButtons68(){
+    reorderDutchButtons68();
+    Array.from(document.querySelectorAll("button")).forEach(btn=>{
+      const t=(btn.innerText||"").trim();
+      if(t.includes("按完整模型重新分析")){
+        btn.type="button";
+        btn.onclick=function(e){ if(e){e.preventDefault();e.stopPropagation();} return window.jaxStableAnalyze(); };
+      }
+      if(t==="AI计算权重" && typeof window.aiCalculateTotalDutchWeights==="function"){
+        btn.type="button";
+        btn.onclick=function(e){ if(e){e.preventDefault();e.stopPropagation();} return window.aiCalculateTotalDutchWeights(); };
+      }
+      if(t==="计算 Dutching + ROI" && typeof window.jaxCalcTotalDutchingROI==="function"){
+        btn.type="button";
+        btn.onclick=function(e){ if(e){e.preventDefault();e.stopPropagation();} return window.jaxCalcTotalDutchingROI(); };
+      }
+    });
+  }
+
+  document.addEventListener("click", function(e){
+    const btn=e.target && e.target.closest ? e.target.closest("button") : null;
+    if(!btn) return;
+    const t=(btn.innerText||"").trim();
+    if(t.includes("按完整模型重新分析")){
+      e.preventDefault(); e.stopPropagation(); if(e.stopImmediatePropagation) e.stopImmediatePropagation();
+      return window.jaxStableAnalyze();
+    }
+  }, true);
+
+  window.addEventListener("DOMContentLoaded", bindButtons68);
+  setTimeout(bindButtons68,300);
+  setTimeout(bindButtons68,1000);
+  setTimeout(bindButtons68,2000);
+})();
+
+</script>
+
 </body>
 </html>
