@@ -1,6 +1,6 @@
 {
-  "name": "jax-ai-model-v4-3-vercel-fixed",
-  "version": "4.3.0",
+  "name": "jax-ai-model-v4-4-scoreline-fix",
+  "version": "4.4.0",
   "private": true,
   "type": "module",
   "engines": {

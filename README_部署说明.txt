@@ -1,17 +1,18 @@
-JAX的AI模型 V4.3 Vercel部署修正版
+JAX的AI模型 V4.4 波胆推荐修正版
 
 修复内容：
-1. 修复 Vercel 部署失败：移除 vercel.json 里的 runtime 配置。
-2. 保留 V4.2 的所有功能：
-   - 标题：JAX的AI模型
+1. 修复点击“按完整模型重新分析”后，波胆推荐不刷新的问题。
+2. 点击后会强制刷新：
+   - 完整模型分析结果
+   - 本场波胆推荐
+   - 本场波胆 Dutching 快捷区
+3. 保留 V4.3 的所有功能：
+   - Vercel 部署修复
    - 原下注截图 OCR
    - 实时赔率截图 OCR
-   - 自动生成对冲池
-   - 自动计算权重、建议金额、收益、ROI
-   - 联网赔率、Dutching、赛后复盘
-3. 不需要重新申请 The Odds API Key。
-4. 不需要重建 Vercel 项目。
+   - 自动对冲池
+   - 自动权重、建议金额、收益、ROI
+4. vercel.json 仍保持空配置 {}，避免 Vercel runtime 报错。
 
 升级方式：
-把这个压缩包解压后，重新覆盖上传到 GitHub 仓库 football-model2。
-重点：vercel.json 也要覆盖上传。
+解压后覆盖上传到 GitHub 仓库 football-model2。
