@@ -147,7 +147,7 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
 </head>
 <body>
 <header><h1>JAX的AI模型</h1>
-<p>联网赔率 + 天气/战意/教练/阵容/体能/裁判因素 + 动态比分推演 + Dutching + 滚球对冲OCR + 赛后复盘｜V6.9</p>
+<p>联网赔率 + 天气/战意/教练/阵容/体能/裁判因素 + 动态比分推演 + Dutching三模式 + 滚球对冲OCR + 赛后复盘｜V7.0</p>
 </header>
 <div class="notice">
   使用说明：API Key 仍然只放在 Vercel 环境变量 <b>THE_ODDS_API_KEY</b> 中，朋友打开网站不需要自己填 Key。
@@ -771,7 +771,7 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
       </div>
 </section>
 </main>
-<footer>JAX的AI模型｜V6.9 操作流程与盘口中文解释优化版｜首页流程更清晰，近期比赛滚动显示，盘口英文增加中文解释。</footer>
+<footer>JAX的AI模型｜V7.0 波胆动态推演 + Dutching三模式高亮版｜波胆权重离散、剧本来源解释、三种Dutching分配模式。</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js">
 function previewDutchImage(e){
@@ -8509,8 +8509,8 @@ document.addEventListener("DOMContentLoaded", function(){
 </script>
 <script>
 
-/* V6.7 remove duplicate review panels
-   只保留 V6.6/V6.7 新复盘模块 v66ReviewPanel。
+/* V7.0 inherited duplicate review panel cleanup
+   只保留 新版复盘模块 v66ReviewPanel。
    隐藏旧版“赛后复盘历史记录”模块，避免页面出现两个重复区域。
 */
 (function(){
@@ -8617,7 +8617,7 @@ document.addEventListener("DOMContentLoaded", function(){
 
 <script>
 
-/* V6.8 dynamic scoreline engine + Dutching button order
+/* V7.0 dynamic scoreline engine + Dutching button order
    1. 本场波胆推荐不再使用固定模板，而是根据每场比赛的赔率结构、隐含概率、强弱关系、天气、教练、阵容、体能、裁判、盘口热度等重新推演。
    2. 不强制每场比赛必须不同；若两场比赛模型输入高度相似，结果可以相似，但必须由模型计算得出。
    3. API赔率显示平均赔率、隐含概率和盘口倾向。
@@ -8920,7 +8920,7 @@ document.addEventListener("DOMContentLoaded", function(){
         保护比分：<b>${rows[1]?.score||"-"}</b>、<b>${rows[2]?.score||"-"}</b>。
         下方波胆池由赔率结构与当前输入项动态生成，不再使用固定模板。
       </div>
-      <p class="small">V6.8 动态比分推演已执行：${new Date().toLocaleTimeString()}</p>
+      <p class="small">V7.0 操作流程与盘口中文解释已执行：${new Date().toLocaleTimeString()}</p>
     `;
   }
 
@@ -9020,7 +9020,7 @@ document.addEventListener("DOMContentLoaded", function(){
 
 
 <style>
-/* V6.9 首页流程优化 */
+/* V7.0 首页流程优化 */
 #online > .grid{display:block !important}
 #online > .grid > .card{width:100%;margin-bottom:18px}
 #matchList.v69MatchList{max-height:360px;overflow-y:auto;padding-right:8px}
@@ -9035,7 +9035,7 @@ document.addEventListener("DOMContentLoaded", function(){
 </style>
 <script>
 
-/* V6.9 flow UI + Chinese odds explanation
+/* V7.0 flow UI + Chinese odds explanation
    1. 首页改为：联网设置在上，近期比赛在下。
    2. 近期比赛固定高度滚动，不撑长页面。
    3. 近期比赛英文队名增加中文翻译。
@@ -9366,6 +9366,520 @@ document.addEventListener("DOMContentLoaded", function(){
   setTimeout(bindV69,300);
   setTimeout(bindV69,1000);
   setTimeout(bindV69,2000);
+})();
+</script>
+
+
+<style>
+/* V7.0: scoreline hierarchy + Dutching 3 modes */
+.v70-mode-wrap{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  background:#fff7ed;border:2px solid #fb923c;border-radius:16px;
+  padding:9px 12px;box-shadow:0 6px 16px rgba(249,115,22,.12)
+}
+.v70-mode-wrap label{font-weight:900;color:#9a3412;margin:0}
+.v70-mode-select{
+  min-width:250px;border:2px solid #f97316!important;background:#fff!important;
+  font-weight:900;color:#111827;border-radius:12px!important;padding:9px 12px!important
+}
+.v70-mode-help{font-size:12px;color:#9a3412;line-height:1.5;width:100%;margin-top:4px}
+.v70-source-tag{display:inline-block;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;border-radius:999px;padding:2px 8px;margin:2px;font-size:12px}
+.v70-warn{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:12px;padding:10px;margin:10px 0;line-height:1.6}
+.v70-role{font-weight:900;color:#0f172a}
+.v70-mode-note{font-size:13px;color:#475569;line-height:1.65;margin-top:8px}
+</style>
+<script>
+/* V7.0 波胆动态推演 + Dutching三模式高亮版 */
+(function(){
+  function el(id){ return document.getElementById(id); }
+  function num(v){ const n=parseFloat(String(v||"").replace(/[^\d.\-]/g,"")); return isFinite(n)?n:0; }
+  function fmt(n){ n=Number(n); return isFinite(n)?n.toFixed(2):"-"; }
+  function pct(n){ n=Number(n); return isFinite(n)?n.toFixed(1)+"%":"-"; }
+  function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
+  function avg(arr){ arr=(arr||[]).filter(x=>isFinite(x)); return arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:NaN; }
+  function poisson(k,l){ let f=1; for(let i=2;i<=k;i++) f*=i; return Math.exp(-l)*Math.pow(l,k)/f; }
+  function safeEvent(){ try{ if(typeof selectedEvent!=="undefined" && selectedEvent) return selectedEvent; }catch(e){} return window.selectedEvent||null; }
+  function text(id){ const x=el(id); if(!x) return ""; if(x.tagName==="SELECT" && x.selectedOptions && x.selectedOptions[0]) return x.selectedOptions[0].textContent.trim(); return (x.value||x.innerText||"").trim(); }
+  function value(id){ const x=el(id); return x ? (x.value||"").trim() : ""; }
+  function parseScore(s){ const m=String(s||"").match(/(\d{1,2})\s*[-:]\s*(\d{1,2})/); return m?{h:+m[1],a:+m[2],total:+m[1]+(+m[2]),diff:+m[1]-(+m[2])}:null; }
+
+  function collectMarkets(ev){
+    const out={h2h:[],totals:[],spreads:[]};
+    if(!ev||!ev.bookmakers) return out;
+    (ev.bookmakers||[]).forEach(b=>(b.markets||[]).forEach(m=>{ if(out[m.key]) out[m.key].push({book:b.title,outcomes:m.outcomes||[]}); }));
+    return out;
+  }
+  function h2hProb(ev){
+    const ret={h:[],d:[],a:[]};
+    collectMarkets(ev).h2h.forEach(mm=>(mm.outcomes||[]).forEach(o=>{
+      const p=Number(o.price);
+      if(!(p>1)) return;
+      if(o.name===ev.home_team) ret.h.push(p);
+      else if(String(o.name).toLowerCase()==="draw") ret.d.push(p);
+      else if(o.name===ev.away_team) ret.a.push(p);
+    }));
+    const oh=avg(ret.h), od=avg(ret.d), oa=avg(ret.a);
+    let ih=oh>1?1/oh:0, id=od>1?1/od:0, ia=oa>1?1/oa:0;
+    ih=clamp(ih,0,1); id=clamp(id,0,1); ia=clamp(ia,0,1);
+    let s=ih+id+ia;
+    if(!s){ ih=.38; id=.29; ia=.33; s=1; }
+    return {
+      homeOdds:oh, drawOdds:od, awayOdds:oa,
+      homeP:clamp(ih/s*100,0,100),
+      drawP:clamp(id/s*100,0,100),
+      awayP:clamp(ia/s*100,0,100),
+      books:Math.max(ret.h.length,ret.d.length,ret.a.length)
+    };
+  }
+  function totalsInfo(ev){
+    const rows=[];
+    collectMarkets(ev).totals.forEach(mm=>(mm.outcomes||[]).forEach(o=>rows.push(o)));
+    const overs=rows.filter(o=>String(o.name).toLowerCase()==="over");
+    const unders=rows.filter(o=>String(o.name).toLowerCase()==="under");
+    const line=avg(overs.map(o=>Number(o.point)).filter(isFinite));
+    const over=avg(overs.map(o=>Number(o.price)).filter(x=>x>1));
+    const under=avg(unders.map(o=>Number(o.price)).filter(x=>x>1));
+    let overP=50, underP=50;
+    if(over>1 && under>1){ const io=1/over, iu=1/under, s=io+iu; overP=io/s*100; underP=iu/s*100; }
+    return {line:isFinite(line)?line:2.5, overP, underP, over, under};
+  }
+  function inputs(){
+    return {
+      matchType:value("matchType"), matchTypeText:text("matchType"),
+      powerGap:value("powerGap"), powerGapText:text("powerGap"),
+      marketHeat:value("marketHeat"), marketHeatText:text("marketHeat"),
+      weather:value("weatherImpact"), weatherText:text("weatherImpact"),
+      coach:value("coachIntent"), coachText:text("coachIntent"),
+      lineup:value("lineupState"), lineupText:text("lineupState"),
+      fatigue:value("fatigue"), fatigueText:text("fatigue"),
+      refStrict:value("refStrict"), refStrictText:text("refStrict"),
+      refRelation:value("refRelation"), refRelationText:text("refRelation"),
+      cardRisk:value("cardRisk"), cardRiskText:text("cardRisk"),
+      varRisk:value("varRisk"), varRiskText:text("varRisk"),
+      homeManual:num(value("modelHomeP")), drawManual:num(value("modelDrawP")), awayManual:num(value("modelAwayP"))
+    };
+  }
+  function adjustModel(base, inp, totals){
+    let h=base.homeP, d=base.drawP, a=base.awayP;
+    // manual probabilities override, but never allow negative
+    if(inp.homeManual || inp.drawManual || inp.awayManual){
+      h=clamp(inp.homeManual||h,0,100); d=clamp(inp.drawManual||d,0,100); a=clamp(inp.awayManual||a,0,100);
+    }
+    const reasons=[], low=[], high=[];
+    let totalAdj=0, risk=0, favAdj=0, drawAdj=0;
+
+    if(inp.powerGap==="balanced"){drawAdj+=2; reasons.push("强弱关系偏均势，防平权重增加");}
+    if(inp.powerGap==="favorite_big"){favAdj+=4; reasons.push("强弱关系显示一方明显强，主线集中度上调");}
+    if(inp.powerGap==="mismatch"){favAdj+=7; reasons.push("强弱悬殊，强队主线与扩大比分权重上调");}
+
+    if(inp.marketHeat==="hot_fav"){drawAdj+=2; risk+=5; reasons.push("热门过热，保留防平和赢不穿保护");}
+    if(inp.marketHeat==="cold_pull"){drawAdj+=2; risk+=3; reasons.push("冷门有拉力，反向/冷门分支保留");}
+    if(inp.marketHeat==="confusing"){risk+=7; drawAdj+=1; reasons.push("盘口混乱，降低单边置信度");}
+
+    if(inp.weather==="heat"||inp.weather==="humid"||inp.weather==="altitude"){totalAdj-=.22; risk+=3; low.push("高温/湿热/海拔可能降低比赛节奏");}
+    if(inp.weather==="rain"){totalAdj-=.30; drawAdj+=1.5; low.push("雨战降低传控和射门质量");}
+    if(inp.weather==="wind"){totalAdj-=.25; drawAdj+=1; low.push("大风影响传中、远射和定位球落点");}
+
+    if(inp.coach==="full_attack"||inp.coach==="must_win"){totalAdj+=.25; high.push("教练目标偏进攻/抢分");}
+    if(inp.coach==="control"){totalAdj-=.25; drawAdj+=2; low.push("教练存在控分/保守倾向");}
+    if(inp.coach==="rotate"){totalAdj-=.12; risk+=4; reasons.push("轮换保护主力，稳定性下降");}
+
+    if(inp.lineup==="strong"){favAdj+=2; reasons.push("阵容主力齐整，主线稳定性上调");}
+    if(inp.lineup==="injury"){totalAdj-=.18; risk+=4; low.push("关键伤停降低进攻质量");}
+    if(inp.lineup==="rotated"||inp.lineup==="young"){risk+=4; totalAdj-=.10; reasons.push("轮换/实验阵增加不确定性");}
+
+    if(inp.fatigue==="travel"||inp.fatigue==="short_rest"){totalAdj-=.16; drawAdj+=1; low.push("赛程/旅途影响后程节奏");}
+    if(inp.fatigue==="advantage"){favAdj+=1.5; reasons.push("体能占优，后程压制力略升");}
+
+    if(inp.refStrict==="penalty_var"){totalAdj+=.25; risk+=4; high.push("裁判点球/VAR倾向高，爆点比分上调");}
+    if(inp.refStrict==="strict"){totalAdj+=.10; risk+=3; high.push("裁判严格，红黄牌和定位球变数上升");}
+    if(inp.refStrict==="loose"){totalAdj-=.08; low.push("裁判宽松，弱队身体对抗收益上升");}
+    if(inp.cardRisk==="high"||inp.cardRisk==="derby"){totalAdj+=.16; risk+=4; high.push("红黄牌风险高，比赛结构可能被打破");}
+    if(inp.varRisk==="high"){totalAdj+=.16; risk+=3; high.push("VAR/点球风险高，2-1、2-2、3-1等分支上调");}
+    if(inp.refRelation==="controversy"||inp.refRelation==="region_sensitive"){risk+=4; reasons.push("裁判历史/地区敏感提升不确定性");}
+
+    if(h>=a) h+=favAdj; else a+=favAdj;
+    d+=drawAdj;
+    h=clamp(h,0,100); d=clamp(d,0,100); a=clamp(a,0,100);
+    let sum=h+d+a;
+    if(!sum){h=38;d=29;a=33;sum=100;}
+    h=h/sum*100; d=d/sum*100; a=a/sum*100;
+
+    let tg=(totals.line&&totals.line>1)?totals.line:2.5;
+    if(totals.overP>54) tg+=.18;
+    if(totals.underP>54) tg-=.18;
+    tg=clamp(tg+totalAdj,1.55,3.70);
+
+    const maxP=Math.max(h,a), gap=Math.abs(h-a);
+    let confidence=0;
+    confidence += clamp((maxP-45)/40,0,1)*0.45;
+    confidence += clamp(gap/55,0,1)*0.35;
+    if(inp.powerGap==="favorite_big") confidence+=0.12;
+    if(inp.powerGap==="mismatch") confidence+=0.22;
+    if(inp.marketHeat==="confusing") confidence-=0.18;
+    if(risk>7) confidence-=0.10;
+    confidence=clamp(confidence,0,1);
+
+    return {homeP:h,drawP:d,awayP:a,totalGoals:tg,confidence,risk,reasons,low,high};
+  }
+  function scenarioFrom(m){
+    const maxP=Math.max(m.homeP,m.awayP), gap=Math.abs(m.homeP-m.awayP);
+    if(maxP>=78 || gap>=55) return "huge_fav";
+    if(maxP>=63 || gap>=30) return "strong_fav";
+    if(m.drawP>=30 || gap<12) return "balanced";
+    return "medium_fav";
+  }
+  function buildV70Scorelines(){
+    const ev=safeEvent()||{home_team:"主队",away_team:"客队",bookmakers:[]};
+    const base=h2hProb(ev), tot=totalsInfo(ev), inp=inputs(), m=adjustModel(base,inp,tot);
+    const homeFav=m.homeP>=m.awayP;
+    const gap=(m.homeP-m.awayP)/100;
+    let homeXG=m.totalGoals/2 + gap*.95 + .08;
+    let awayXG=m.totalGoals-homeXG;
+    homeXG=clamp(homeXG,.25,3.8); awayXG=clamp(awayXG,.20,3.5);
+
+    const probs=[];
+    for(let hg=0; hg<=5; hg++){
+      for(let ag=0; ag<=5; ag++){
+        let p=poisson(hg,homeXG)*poisson(ag,awayXG);
+        const total=hg+ag;
+        if(hg===ag) p*=1+m.drawP/140;
+        if(total<=1 && (m.low.length||tot.underP>54)) p*=1.18;
+        if(total>=3 && (m.high.length||tot.overP>54)) p*=1.18;
+        if(total>=4 && m.high.length) p*=1.12;
+        if(scenarioFrom(m)==="huge_fav" && (homeFav?hg-ag:ag-hg)>=2) p*=1.18;
+        if(inp.marketHeat==="hot_fav" && Math.abs(hg-ag)<=1) p*=1.10;
+        probs.push({score:hg+"-"+ag,hg,ag,total,p});
+      }
+    }
+    probs.sort((a,b)=>b.p-a.p);
+    const chosen=[];
+    const used=new Set();
+    function take(cond){
+      let x=probs.find(r=>cond(r)&&!used.has(r.score));
+      if(!x) x=probs.find(r=>!used.has(r.score));
+      if(x) used.add(x.score);
+      return x;
+    }
+    function add(scene,cond,use,source){
+      const x=take(cond); if(!x) return;
+      chosen.push({scene,score:x.score,raw:x.p,use,source});
+    }
+    const sc=scenarioFrom(m);
+    if(sc==="huge_fav" || sc==="strong_fav"){
+      add("强队主剧本", x=>homeFav?x.hg>x.ag:x.ag>x.hg, "主仓候选", ["赔率明显支持强势方","主胜/客胜概率差距大"]);
+      add("强队扩大", x=>(homeFav?x.hg-x.ag:x.ag-x.hg)>=2, "次主仓", ["强弱关系清晰","模型置信度较高"]);
+      add("控分保护", x=>Math.abs(x.hg-x.ag)===1 && (homeFav?x.hg>x.ag:x.ag>x.hg), "防守保护", ["世界杯赛制/热门过热时防赢不穿"]);
+      add("零封保护", x=>homeFav?(x.ag===0&&x.hg>x.ag):(x.hg===0&&x.ag>x.hg), "保护候选", ["强队方向占优","弱势方进球预期低"]);
+      add("平局冷门", x=>x.hg===x.ag, "冷门小仓", ["足球不确定性","热门过热或保守节奏需防平"]);
+      add("爆点大胜", x=>x.total>=4 && (homeFav?x.hg>x.ag:x.ag>x.hg), "爆点小仓", ["早进球/点球/红牌可能打开比分"]);
+    }else if(sc==="balanced"){
+      add("平局主剧本", x=>x.hg===x.ag, "主仓候选", ["双方概率接近","平局概率偏高"]);
+      add("小胜剧本", x=>Math.abs(x.hg-x.ag)===1, "二仓候选", ["一球差是均势局常见终局"]);
+      add("防守剧本", x=>x.total<=1, "防守保护", ["低节奏/天气/体能可能压低进球"]);
+      add("反击剧本", x=>homeFav?x.ag>x.hg:x.hg>x.ag, "反击小仓", ["弱势方反击与临场波动"]);
+      add("二次小胜", x=>Math.abs(x.hg-x.ag)===1, "保护候选", ["两边都有一球胜分支"]);
+      add("爆点剧本", x=>x.total>=3, "爆点小仓", ["早进球/VAR/红牌会放大进球数"]);
+    }else{
+      add("主剧本", x=>homeFav?x.hg>x.ag:x.ag>x.hg, "主仓候选", ["赔率/模型概率支持优势方"]);
+      add("一球差保护", x=>Math.abs(x.hg-x.ag)===1 && (homeFav?x.hg>x.ag:x.ag>x.hg), "二仓候选", ["优势存在但不至于碾压"]);
+      add("平局保护", x=>x.hg===x.ag, "保护候选", ["平局概率与赛制提示需要防平"]);
+      add("低比分保护", x=>x.total<=1, "防守保护", ["天气、体能、教练或小球倾向会压低进球"]);
+      add("反向/冷门", x=>homeFav?x.ag>x.hg:x.hg>x.ag, "冷门小仓", ["热门过热、红牌、VAR、阵容波动下保留反向"]);
+      add("爆点剧本", x=>x.total>=3, "爆点小仓", ["大球结构或临场事件会打开比分"]);
+    }
+
+    // Weight dispersion: high confidence -> sharper hierarchy; balanced -> softer.
+    const alpha=1.0 + m.confidence*2.2;
+    let totalRaw=chosen.reduce((s,x)=>s+Math.pow(Math.max(x.raw,0.00001), alpha),0)||1;
+    let rows=chosen.map((x,i)=>{
+      const w=Math.pow(Math.max(x.raw,0.00001), alpha)/totalRaw*100;
+      return {
+        scene:x.scene, score:x.score, raw:x.raw, weight:Math.round(w), use:x.use,
+        note:(x.source||[]).join("；"),
+        source:x.source||[]
+      };
+    });
+
+    // Minimum/maximum shaping
+    rows.forEach((r,i)=>{
+      if(i===0 && (sc==="huge_fav"||sc==="strong_fav")) r.weight=Math.max(r.weight, sc==="huge_fav"?36:30);
+      if(i>3 && (sc==="huge_fav"||sc==="strong_fav")) r.weight=Math.min(r.weight, 10);
+      if(sc==="balanced" && i===0) r.weight=clamp(r.weight,22,28);
+    });
+    let sumW=rows.reduce((s,r)=>s+r.weight,0)||1;
+    rows=rows.map(r=>Object.assign(r,{weight:Math.max(3,Math.round(r.weight/sumW*100))}));
+    let diff=100-rows.reduce((s,r)=>s+r.weight,0);
+    if(rows[0]) rows[0].weight+=diff;
+
+    const extra=[].concat(m.reasons,m.low,m.high).slice(0,4);
+    rows.forEach(r=>{
+      extra.forEach(e=>{ if(r.source.indexOf(e)<0 && r.source.length<4) r.source.push(e); });
+      r.note=r.source.join("；");
+    });
+    rows.summary70={event:ev,base,tot,inp,model:m,homeXG,awayXG,scenario:sc};
+    try{ currentScorelines=rows; }catch(e){}
+    window.currentScorelines=rows; window.JAX_SCORELINES=rows; window.JAX_SCORELINE_SUMMARY_V70=rows.summary70;
+    return rows;
+  }
+  function renderModelTableV70(rows){
+    const table=el("modelScoreTable"); if(!table) return;
+    const thead=table.querySelector("thead");
+    if(thead) thead.innerHTML="<tr><th>排序</th><th>剧本</th><th>波胆</th><th>模型权重</th><th>推荐用途</th><th>触发来源</th><th>说明</th></tr>";
+    const tb=table.querySelector("tbody"); if(!tb) return;
+    tb.innerHTML=rows.map((s,i)=>`<tr>
+      <td>${i+1}</td><td>${s.scene}</td><td><b>${s.score}</b></td>
+      <td>${s.weight}%<div class="scorebar"><span style="width:${s.weight}%"></span></div></td>
+      <td>${s.use||""}</td>
+      <td>${(s.source||[]).map(x=>`<span class="v70-source-tag">${x}</span>`).join("")}</td>
+      <td>${s.note||""}</td>
+    </tr>`).join("");
+  }
+  function renderAnalysisV70(rows){
+    const box=el("analysisResult"); if(!box) return;
+    const s=rows.summary70||{}, ev=s.event||{}, m=s.model||{}, base=s.base||{}, tot=s.tot||{};
+    const match=(ev.home_team&&ev.away_team)?`${ev.home_team} vs ${ev.away_team}`:"已选比赛";
+    const fav=m.homeP>=m.awayP?(ev.home_team||"主队"):(ev.away_team||"客队");
+    const confText=m.confidence>=.7?"高":(m.confidence>=.38?"中":"低");
+    box.innerHTML=`
+      <h3>完整模型分析结果</h3>
+      <p><b>${match}</b></p>
+      <h3>API赔率明细 / 自动带入模型</h3>
+      <table>
+        <thead><tr><th>项目</th><th>平均赔率</th><th>隐含/模型概率</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>主胜</td><td>${fmt(base.homeOdds)}</td><td>${pct(m.homeP)}</td><td>${ev.home_team||"主队"}</td></tr>
+          <tr><td>平局</td><td>${fmt(base.drawOdds)}</td><td>${pct(m.drawP)}</td><td>防平参考</td></tr>
+          <tr><td>客胜</td><td>${fmt(base.awayOdds)}</td><td>${pct(m.awayP)}</td><td>${ev.away_team||"客队"}</td></tr>
+          <tr><td>大小球</td><td>${fmt(tot.line)}</td><td>大 ${pct(tot.overP)} / 小 ${pct(tot.underP)}</td><td>总进球模型约 ${fmt(m.totalGoals)}</td></tr>
+        </tbody>
+      </table>
+      <h3>模型输入修正</h3>
+      <ul>
+        <li>比赛性质：${s.inp?.matchTypeText||"-"}；强弱关系：${s.inp?.powerGapText||"-"}；盘口热度：${s.inp?.marketHeatText||"-"}。</li>
+        <li>天气：${s.inp?.weatherText||"-"}；教练：${s.inp?.coachText||"-"}；阵容：${s.inp?.lineupText||"-"}；体能：${s.inp?.fatigueText||"-"}。</li>
+        <li>裁判：${s.inp?.refStrictText||"-"} / ${s.inp?.refRelationText||"-"} / ${s.inp?.cardRiskText||"-"} / ${s.inp?.varRiskText||"-"}。</li>
+        <li>预计进球：${ev.home_team||"主队"} ${fmt(s.homeXG)}，${ev.away_team||"客队"} ${fmt(s.awayXG)}；模型置信度：<b>${confText}</b>。</li>
+      </ul>
+      <h3>为什么推这些比分</h3>
+      <ul>
+        <li>优势方向：${fav}；剧本类型：${s.scenario||"-"}。</li>
+        <li>波胆权重已按置信度拉开：强弱越明确，主线越集中；均势局才更分散。</li>
+        <li>每个波胆的“触发来源”已在下方表格中单独列出。</li>
+      </ul>
+      <h3>当前主线</h3>
+      <div class="result-box">当前主线比分：<b>${rows[0]?.score||"-"}</b>；保护比分：<b>${rows[1]?.score||"-"}</b>、<b>${rows[2]?.score||"-"}</b>。下方波胆池由赔率结构与当前输入项动态生成。</div>
+      <p class="small">V7.0 波胆权重离散推演已执行：${new Date().toLocaleTimeString()}</p>
+    `;
+  }
+  window.jaxStableAnalyze=function(){
+    const ev=safeEvent();
+    if(!ev||!(ev.home_team&&ev.away_team)){ const b=el("analysisResult"); if(b)b.innerHTML="请先选择比赛。"; return false; }
+    const rows=buildV70Scorelines();
+    renderAnalysisV70(rows);
+    renderModelTableV70(rows);
+    if(typeof jaxRenderInlineDutch==="function") jaxRenderInlineDutch(rows);
+    return false;
+  };
+
+  const modeOpts=[
+    ["ladder","阶梯利润最大化型"],
+    ["weighted","AI权重倾斜型"],
+    ["equal","等回报 Dutching（利润平摊型）"]
+  ];
+  function modeHelp(mode){
+    if(mode==="equal") return "等回报 Dutching（利润平摊型）：反向分配金额，让每个已选结果命中后的总返还和命中净收益尽量接近。";
+    if(mode==="weighted") return "AI权重倾斜型：按AI/模型权重分配金额，模型越看好的结果金额越高；不同比分命中后的返还和ROI会不同。";
+    return "阶梯利润最大化型：主仓追高利润，次主仓追中等利润，防守仓尽量保本，小仓防穿减少极端亏损。";
+  }
+  function createModeWrap(id){
+    const wrap=document.createElement("div");
+    wrap.className="v70-mode-wrap";
+    wrap.innerHTML=`<label>分配方式</label><select id="${id}" class="v70-mode-select">${modeOpts.map(o=>`<option value="${o[0]}">${o[1]}</option>`).join("")}</select><div class="v70-mode-help">${modeHelp("ladder")}</div>`;
+    const sel=wrap.querySelector("select"), help=wrap.querySelector(".v70-mode-help");
+    sel.value="ladder";
+    sel.addEventListener("change",()=>{help.textContent=modeHelp(sel.value);});
+    return wrap;
+  }
+  function setupModes(){
+    // 主 Dutching 页面：只在“添加一行”和“AI计算权重”之间插入模式选择，其他结构不动
+    const dutch=el("dutch");
+    if(dutch && !el("jaxDutchMode")){
+      const buttons=Array.from(dutch.querySelectorAll("button"));
+      const add=buttons.find(b=>(b.innerText||"").includes("添加一行"));
+      const ai=buttons.find(b=>(b.innerText||"").includes("AI计算权重"));
+      if(add && ai && add.parentElement===ai.parentElement){
+        const wrap=createModeWrap("jaxDutchMode");
+        add.parentElement.insertBefore(wrap, ai);
+      }
+    }
+    // 快捷区下拉框同步三种模式
+    const inline=el("inlineDutchMode");
+    if(inline && !inline.dataset.v70){
+      inline.innerHTML=modeOpts.map(o=>`<option value="${o[0]}">${o[1]}</option>`).join("");
+      inline.value="ladder";
+      inline.dataset.v70="1";
+      inline.classList.add("v70-mode-select");
+      const parent=inline.closest("div");
+      if(parent && !parent.querySelector(".v70-mode-help")){
+        const h=document.createElement("div"); h.className="v70-mode-help"; h.textContent=modeHelp("ladder"); parent.appendChild(h);
+        inline.addEventListener("change",()=>h.textContent=modeHelp(inline.value));
+      }
+    }
+  }
+  function readRows(table){
+    const rows=[];
+    if(!table) return rows;
+    table.querySelectorAll("tbody tr").forEach(tr=>{
+      const ins=tr.querySelectorAll("input");
+      if(ins.length>=3){
+        const item=(ins[0].value||"").trim(), odds=num(ins[1].value), weight=num(ins[2].value);
+        if(item && odds>1) rows.push({tr,item,odds,weight});
+      }else if(ins.length>=4){
+        const item=(ins[1].value||"").trim(), odds=num(ins[3].value), weight=num(ins[2].value);
+        if(item && odds>1) rows.push({tr,item,odds,weight});
+      }
+    });
+    return rows;
+  }
+  function calcWeightsForRows(rows){
+    const model=window.currentScorelines||window.JAX_SCORELINES||[];
+    const map={}; model.forEach(r=>{map[r.score]=r.weight;});
+    let vals=rows.map(r=>{
+      const parsed=parseScore(r.item);
+      let base=map[r.item] || 0;
+      if(!base && parsed){
+        if(["1-0","1-1","2-1","2-0","3-1","0-1","0-0","1-2"].includes(r.item)) base=22;
+        else if(parsed.total>=5) base=8;
+        else base=14;
+      }
+      const implied=1/r.odds;
+      const oddsScore=clamp(implied*100,4,28);
+      return Math.max(2, base*0.68 + oddsScore*0.32);
+    });
+    const sum=vals.reduce((a,b)=>a+b,0)||1;
+    vals=vals.map(v=>Math.round(v/sum*100));
+    let diff=100-vals.reduce((a,b)=>a+b,0);
+    if(vals.length) vals[0]+=diff;
+    rows.forEach((r,i)=>{ r.weight=vals[i]; const ins=r.tr.querySelectorAll("input"); if(ins.length>=3) ins[2].value=vals[i]; });
+    return rows;
+  }
+  window.fillDutchFromScorelines=function(){
+    const rows=readRows(el("dutchTable"));
+    if(!rows.length){ alert("请先手动填写比分/结果和赔率。AI只计算权重，不会自动改你的比分和赔率。"); return false; }
+    calcWeightsForRows(rows);
+    const res=el("dutchResult");
+    if(res) res.innerHTML='<div class="v70-warn"><b>AI权重已计算：</b>系统只根据你手动输入的比分/结果与赔率重新分配权重，未修改你填写的比分和赔率。下一步请选择模式并点击“计算 Dutching + ROI”。</div>';
+    return false;
+  };
+  function budgetMain(){
+    const b=el("dutchBank"); return b?num(b.value):0;
+  }
+  function budgetInline(){
+    const b=el("inlineDutchBank"); return b?num(b.value):0;
+  }
+  function calcStakeRows(rows,budget,mode){
+    if(!budget||budget<=0) return [];
+    rows=rows.filter(r=>r.odds>1);
+    if(!rows.length) return [];
+    const sumW=rows.reduce((s,r)=>s+(num(r.weight)||1),0)||1;
+    let out=[];
+    if(mode==="equal"){
+      const denom=rows.reduce((s,r)=>s+1/r.odds,0)||1;
+      const target=budget/denom;
+      out=rows.map((r,i)=>({role:"利润平摊",...r,stake:target/r.odds}));
+    }else if(mode==="weighted"){
+      out=rows.map(r=>({role:"权重倾斜",...r,stake:budget*((num(r.weight)||1)/sumW)}));
+    }else{
+      const sorted=rows.map((r,i)=>({...r,orig:i})).sort((a,b)=>(b.weight||0)-(a.weight||0));
+      const shareTemplates={
+        1:[1],2:[.68,.32],3:[.55,.30,.15],4:[.46,.27,.17,.10],5:[.40,.24,.16,.12,.08],6:[.36,.22,.16,.11,.08,.07]
+      };
+      let shares=shareTemplates[Math.min(sorted.length,6)]||shareTemplates[6];
+      if(sorted.length>6){
+        const rest=sorted.length-6, each=0.02;
+        shares=shares.concat(Array(rest).fill(each));
+        const ss=shares.reduce((a,b)=>a+b,0); shares=shares.map(x=>x/ss);
+      }
+      const roles=["主仓利润最大","次主仓中等利润","防守仓保本","小仓防穿","冷门/爆点保护","极端小仓"];
+      out=sorted.map((r,i)=>({role:roles[Math.min(i,roles.length-1)],...r,stake:budget*shares[i]})).sort((a,b)=>a.orig-b.orig);
+    }
+    out.forEach(r=>{ r.return=r.stake*r.odds; r.net=r.return-budget; r.roi=budget? r.net/budget*100:0; });
+    return out;
+  }
+  function modeName(mode){ return modeOpts.find(o=>o[0]===mode)?.[1]||mode; }
+  function renderDutchResult(target,rows,budget,mode,title){
+    const best=rows.slice().sort((a,b)=>b.net-a.net)[0], worst=rows.slice().sort((a,b)=>a.net-b.net)[0];
+    target.innerHTML=`<h3>${title||"Dutching + ROI 计算结果"}</h3>
+      <p><b>分配方式：</b>${modeName(mode)}；<b>总投入：</b>${fmt(budget)}。</p>
+      <p class="v70-mode-note">${modeHelp(mode)}</p>
+      <table><thead><tr><th>结果/比分</th><th>仓位等级</th><th>赔率</th><th>AI权重</th><th>建议模拟金额</th><th>命中总返还</th><th>命中净收益</th><th>ROI</th></tr></thead>
+      <tbody>${rows.map(r=>`<tr><td><b>${r.item}</b></td><td><span class="v70-role">${r.role}</span></td><td>${fmt(r.odds)}</td><td>${fmt(r.weight)}%</td><td><b>${fmt(r.stake)}</b></td><td>${fmt(r.return)}</td><td><b>${fmt(r.net)}</b></td><td>${pct(r.roi)}</td></tr>`).join("")}</tbody></table>
+      <p><b>最好命中：</b>${best?.item||"-"}，命中净收益 ${fmt(best?.net||0)}；<b>最差命中：</b>${worst?.item||"-"}，命中净收益 ${fmt(worst?.net||0)}。</p>
+      <p><b>未覆盖风险：</b>如果最终结果不在这组结果里，亏损约 -${fmt(budget)}。</p>
+      <p class="small">说明：命中总返还 = 赔率 × 建议模拟金额；命中净收益 = 命中总返还 - 总预算。</p>`;
+  }
+  window.calcDutch=function(){
+    const rows=readRows(el("dutchTable"));
+    const budget=budgetMain();
+    const mode=(el("jaxDutchMode")&&el("jaxDutchMode").value)||"ladder";
+    const res=el("dutchResult");
+    if(!rows.length){ if(res)res.innerHTML="请先填写比分/结果和赔率。"; return false; }
+    if(!budget){ if(res)res.innerHTML="请先填写总预算。"; return false; }
+    const out=calcStakeRows(rows,budget,mode);
+    if(res) renderDutchResult(res,out,budget,mode,"Dutching + ROI 计算结果");
+    window.JAX_LAST_TOTAL_DUTCH={time:new Date().toLocaleString(),budget,mode:modeName(mode),rows:out};
+    return false;
+  };
+  window.jaxCalcTotalDutchingROI=window.calcDutch;
+
+  // Inline quick Dutching calculation supports same 3 modes
+  window.jaxStableCalcDutch=function(){
+    const table=el("inlineDutchTable"), res=el("inlineDutchResult");
+    if(!table||!res) return false;
+    const rows=[];
+    table.querySelectorAll("tbody tr").forEach(tr=>{
+      const ins=tr.querySelectorAll("input");
+      if(ins.length>=4){
+        const item=(ins[1].value||"").trim(), weight=num(ins[2].value), odds=num(ins[3].value);
+        if(item&&odds>1) rows.push({tr,item,weight,odds});
+      }
+    });
+    const budget=budgetInline();
+    const mode=(el("inlineDutchMode")&&el("inlineDutchMode").value)||"ladder";
+    if(!rows.length){res.innerHTML="请先由模型生成比分池，并填写赔率。";return false;}
+    if(!budget){res.innerHTML="请先填写本场波胆模拟预算。";return false;}
+    const out=calcStakeRows(rows,budget,mode);
+    renderDutchResult(res,out,budget,mode,"本场波胆 Dutching 结果");
+    return false;
+  };
+  // Keep existing name compatible
+  window.jaxStableFillDutch=function(){ 
+    if(typeof window.currentScorelines!=="undefined" && typeof jaxRenderInlineDutch==="function") jaxRenderInlineDutch(window.currentScorelines||[]);
+    setupModes();
+    return false;
+  };
+
+  function bindButtons(){
+    setupModes();
+    Array.from(document.querySelectorAll("button")).forEach(btn=>{
+      const t=(btn.innerText||"").trim();
+      if(t.includes("按完整模型重新分析")||t.includes("开始完整模型分析")){
+        btn.type="button"; btn.onclick=function(e){ if(e){e.preventDefault();e.stopPropagation();} return window.jaxStableAnalyze(); };
+      }
+      if(t==="AI计算权重" && btn.closest("#dutch")){
+        btn.type="button"; btn.onclick=function(e){ if(e){e.preventDefault();e.stopPropagation();} return window.fillDutchFromScorelines(); };
+      }
+      if(t.includes("计算 Dutching + ROI") && btn.closest("#dutch")){
+        btn.type="button"; btn.onclick=function(e){ if(e){e.preventDefault();e.stopPropagation();} return window.calcDutch(); };
+      }
+      if(t.includes("计算本场波胆 Dutching")){
+        btn.type="button"; btn.onclick=function(e){ if(e){e.preventDefault();e.stopPropagation();} return window.jaxStableCalcDutch(); };
+      }
+    });
+  }
+  window.addEventListener("DOMContentLoaded",bindButtons);
+  setTimeout(bindButtons,300); setTimeout(bindButtons,1000); setTimeout(bindButtons,2000);
 })();
 </script>
 
