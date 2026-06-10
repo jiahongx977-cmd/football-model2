@@ -86,6 +86,18 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
 .jaxDebugMini{font-size:12px;color:#64748b;margin-top:8px}
 .modelScoresBox{margin-top:14px;border:1px solid #fde68a;background:#fffbeb;border-radius:14px;padding:14px}
 .modelScoresBox h3{margin-top:0}
+
+.historyBox{margin-top:16px;background:#f8fafc;border:1px solid var(--line);border-radius:14px;padding:14px}
+.historyItem{border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0;background:#fff}
+.historyItem summary{cursor:pointer;font-weight:800}
+.historyDetail{margin-top:10px;white-space:pre-wrap;font-size:13px;line-height:1.55;color:#334155}
+
+.apiOddsBox{margin-top:12px;background:#f8fafc;border:1px solid var(--line);border-radius:14px;padding:14px}
+.apiOddsGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:10px}
+.apiOddsCard{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px}
+.apiOddsCard h4{margin:0 0 8px 0}
+.apiMiniTable{font-size:12px;width:100%;border-collapse:collapse}
+.apiMiniTable td,.apiMiniTable th{padding:6px;border-bottom:1px solid #e5e7eb}
 </style>
 </head>
 <body>
@@ -100,11 +112,11 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
 <main>
   <div class="tabs">
     <button class="active" onclick="showTab('online',this)">联网选比赛</button>
-    <button onclick="showTab('engine',this)">完整模型评分</button>
-    <button onclick="showTab('manualOdds',this)">手动盘口</button>
     <button onclick="showTab('dutch',this)">波胆/冠军 Dutching</button>
     <button onclick="showTab('live',this)">滚球/对冲</button>
+    <button onclick="showTab('manualOdds',this)">手动盘口</button>
     <button onclick="showTab('review',this)">赛后复盘</button>
+    <button onclick="showTab('engine',this)">完整模型评分</button>
   </div>
 
   <section id="online" class="tab">
@@ -163,6 +175,17 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
     <div class="card" style="margin-top:18px">
       <h2>三、选中比赛后自动分析</h2>
       <div id="selectedInfo" class="result-box">未选择比赛。</div>
+
+      <div class="apiOddsBox historyBox">
+        <h3>API赔率明细 / 自动带入模型</h3>
+        <p class="small">选中比赛后，这里会展开 The Odds API 读取到的胜平负、让球、大小球和博彩公司明细。注意：标准 API 通常不提供足球波胆赔率，波胆赔率仍需手动填或截图 OCR。</p>
+        <div class="flex">
+          <button class="btn blue" type="button" onclick="jaxRenderApiOddsDetails()">刷新赔率明细</button>
+          <button class="btn green" type="button" onclick="jaxImportApiOddsToModel()">把API胜平负概率带入模型</button>
+        </div>
+        <div id="apiOddsDetails" class="result-box">选择比赛后显示API赔率明细。</div>
+      </div>
+
       <div class="grid4">
         <div>
           <label>天气城市，可选</label>
@@ -452,7 +475,7 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
   <section id="dutch" class="tab hidden">
     <div class="card">
       <h2>波胆 / 冠军 Dutching 分配</h2>
-      <p class="small">输入多个结果和赔率，系统按等回报分配。适合波胆比分池、冠军池、晋级池。金额可留空，也可填总预算。</p>
+      <p class="small">输入比分/结果、赔率和总预算即可；模型权重由AI自动计算，也可手动微调。系统会输出建议投注、命中回报、净利润、ROI、最好/最差命中和未覆盖风险。</p>
       <label>总预算</label>
       <input id="dutchBank" type="number" placeholder="如 1000 / 3000"/>
       <table id="dutchTable">
@@ -461,12 +484,23 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
       </table>
       <div class="flex">
         <button class="btn" onclick="addDutchRow()">添加一行</button>
-        <button class="btn primary" onclick="calcDutch()">计算 Dutching</button>
-        <button class="btn orange" onclick="fillDutchFromScorelines()">填入当前比分池</button>
+        <button class="btn primary" onclick="calcDutch()">计算 Dutching + ROI</button>
+        <button class="btn orange" onclick="fillDutchFromScorelines()">AI计算权重</button>
       </div>
       <div id="dutchResult" class="result-box">等待计算。</div>
     </div>
-  </section>
+  
+      <div class="historyBox jaxDutchHistoryBox">
+        <h3>Dutching 历史记录</h3>
+        <p class="small">每次计算 Dutching + ROI 后，可以保存为历史记录。点开可查看预算、赔率、权重、建议金额、收益/ROI、最好/最差命中、未覆盖风险等细节。</p>
+        <div class="flex">
+          <button class="btn green" type="button" onclick="jaxSaveDutchHistory()">保存当前 Dutching 记录</button>
+          <button class="btn blue" type="button" onclick="jaxRenderDutchHistory()">查看历史记录</button>
+          <button class="btn red" type="button" onclick="jaxClearDutchHistory()">清空历史记录</button>
+        </div>
+        <div id="dutchHistoryList" class="result-box">暂无历史记录。</div>
+      </div>
+</section>
 
   <section id="live" class="tab hidden">
     <div class="card">
@@ -581,9 +615,20 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
       </div>
       <div id="modelNoteList"></div>
     </div>
-  </section>
+  
+      <div class="historyBox jaxReviewHistoryBox">
+        <h3>赛后复盘历史记录</h3>
+        <p class="small">保存每次赛后复盘，可点开查看当时的模型判断、实际赛果、遗漏因素、后续修正建议。</p>
+        <div class="flex">
+          <button class="btn green" type="button" onclick="jaxSaveReviewHistory()">保存当前复盘记录</button>
+          <button class="btn blue" type="button" onclick="jaxRenderReviewHistory()">查看复盘历史</button>
+          <button class="btn red" type="button" onclick="jaxClearReviewHistory()">清空复盘历史</button>
+        </div>
+        <div id="reviewHistoryList" class="result-box">暂无复盘历史。</div>
+      </div>
+</section>
 </main>
-<footer>JAX的AI模型｜V5.0 AI波胆权重版｜手写波胆后自动计算权重、Dutching金额、收益和ROI。</footer>
+<footer>JAX的AI模型｜V5.5 导航顺序+波胆数量位置修正版｜波胆增减只在Dutching快捷区显示。</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js">
 function previewDutchImage(e){
@@ -1836,7 +1881,7 @@ function jaxRenderInlineDutch(rows){
       }).join("");
     }
   }
-  if(box) box.innerHTML = "已按当前模型比分池生成。请填入真实波胆赔率后再计算 Dutching。";
+  if(box) box.innerHTML = "已按当前模型比分池生成。请填入真实波胆赔率后再计算 Dutching + ROI。";
 }
 
 function jaxStableAnalyze(){
@@ -3666,6 +3711,1468 @@ document.addEventListener("DOMContentLoaded", function(){
         btn.onclick = syncToMain;
       }
     });
+  });
+})();
+
+</script>
+<script>
+
+/* V5.1 full input impact + history
+   所有保留输入项都进入模型修正：城市/气候、比赛性质、强弱关系、盘口热度、天气、教练、阵容、体能、裁判、真实概率、预算。
+   增加 Dutching 历史和赛后复盘历史。
+*/
+(function(){
+  const LS_DUTCH_HISTORY = "jax_dutch_history_v51";
+  const LS_REVIEW_HISTORY = "jax_review_history_v51";
+  window.JAX_LAST_DUTCH_CALC = window.JAX_LAST_DUTCH_CALC || null;
+
+  function el(id){ return document.getElementById(id); }
+  function val(id){
+    const x = el(id);
+    if(!x) return "";
+    return (x.value || x.innerText || "").trim();
+  }
+  function num(v){
+    const n = parseFloat(String(v||"").replace(/[^\d.\-]/g,""));
+    return isFinite(n) ? n : 0;
+  }
+  function fmt(n){ return Number(n||0).toFixed(2); }
+  function pct(n){ return Number(n||0).toFixed(1) + "%"; }
+  function hasReal(v){
+    if(!v) return false;
+    if(v.includes("正常")) return false;
+    if(v.includes("未知")) return false;
+    if(v.includes("中性")) return false;
+    if(v.includes("不触发")) return false;
+    if(v === "normal" || v === "neutral" || v === "unknown") return false;
+    return true;
+  }
+
+  function selectedMatchName(){
+    if(window.selectedMatch){
+      if(window.selectedMatch.home_team && window.selectedMatch.away_team) return window.selectedMatch.home_team + " vs " + window.selectedMatch.away_team;
+      return window.selectedMatch.title || window.selectedMatch.name || "已选比赛";
+    }
+    const text = document.body.innerText || "";
+    const m = text.match(/已选择：\s*([^\n]+)/);
+    if(m && m[1]) return m[1].trim();
+    return "";
+  }
+
+  function getManualProb(){
+    const home = num(val("trueHomeProb") || val("manualHomeProb"));
+    const draw = num(val("trueDrawProb") || val("manualDrawProb"));
+    const away = num(val("trueAwayProb") || val("manualAwayProb"));
+    return {home, draw, away};
+  }
+
+  function inputImpactList(){
+    const city = val("weatherCity");
+    const nature = val("matchNature");
+    const relation = val("teamRelation");
+    const market = val("marketHeat");
+    const weather = val("weatherImpact");
+    const coach = val("coachIntent");
+    const lineup = val("lineupStatus");
+    const stamina = val("scheduleFatigue");
+    const budget = num(val("stakeBudget") || val("analysisBudget") || val("betBudget"));
+    const prob = getManualProb();
+
+    const list = [];
+    if(city){
+      if(/Mexico|墨西哥|CDMX/i.test(city)) list.push("天气城市：墨西哥城/高海拔倾向，体能消耗和节奏波动权重上升。");
+      else if(/Miami|迈阿密/i.test(city)) list.push("天气城市：迈阿密湿热倾向，后段体能下降与低节奏权重上升。");
+      else if(/Los Angeles|洛杉矶/i.test(city)) list.push("天气城市：洛杉矶相对温和，天气冲击较低。");
+      else list.push("天气城市：" + city + " 已作为环境变量纳入模型。");
+    }else list.push("天气城市：未填写，城市环境不额外修正。");
+
+    if(hasReal(nature)) list.push("比赛性质：" + nature + " 已纳入；小组赛偏谨慎，淘汰赛/争胜局会提高爆点和保守分支两端权重。");
+    else list.push("比赛性质：默认处理。");
+
+    if(hasReal(relation)) list.push("强弱关系：" + relation + " 已纳入；会影响强队穿盘、平局保护、冷门保护权重。");
+    else list.push("强弱关系：默认均势处理。");
+
+    if(hasReal(market)) list.push("盘口热度：" + market + " 已纳入；热门过热会提高防平/防冷，冷门热会提高反向保护。");
+    else list.push("盘口热度：默认正常处理。");
+
+    if(hasReal(weather)) list.push("天气影响：" + weather + " 已纳入；会实际修正大小球和低/高比分权重。");
+    else list.push("天气影响：默认正常天气。");
+
+    if(hasReal(coach)) list.push("教练目的：" + coach + " 已纳入；会影响争胜、轮换、控分的比分权重。");
+    else list.push("教练目的：默认正常争胜。");
+
+    if(hasReal(lineup)) list.push("阵容状态：" + lineup + " 已纳入；会影响主线稳定性与冷门保护。");
+    else list.push("阵容状态：未知/默认中性。");
+
+    if(hasReal(stamina)) list.push("赛程体能：" + stamina + " 已纳入；会影响后段进球、控场和失误风险。");
+    else list.push("赛程体能：默认正常。");
+
+    if(prob.home || prob.draw || prob.away){
+      list.push("真实概率：已纳入。主胜 " + (prob.home||"-") + "%，平局 " + (prob.draw||"-") + "%，客胜 " + (prob.away||"-") + "%。");
+    }else list.push("真实概率：未填写，系统按模型估算。");
+
+    if(budget) list.push("投注预算：" + budget + " 已纳入风险提示；预算越高，系统会提高保守保护说明。");
+    else list.push("投注预算：未填写，不做资金风险修正。");
+
+    return list;
+  }
+
+  function refActive(){
+    const vals = [val("refStyle"), val("refRelation"), val("cardRisk"), val("varRisk")];
+    return vals.some(v => hasReal(v) && !v.startsWith("低"));
+  }
+
+  function parseScore(score){
+    const m = String(score||"").match(/(\d{1,2})\s*[-:]\s*(\d{1,2})/);
+    if(!m) return null;
+    const h = parseInt(m[1],10), a = parseInt(m[2],10);
+    return {h,a,total:h+a,diff:h-a};
+  }
+
+  function baseRows(){
+    const relation = val("teamRelation");
+    if(relation.includes("强") && !relation.includes("均势")){
+      return [
+        {scene:"强队主剧本", score:"2-0", weight:28, use:"主仓候选", note:"强弱关系影响：强队零封两球是主线。"},
+        {scene:"小胜剧本", score:"2-1", weight:22, use:"二仓候选", note:"强队赢但被弱队反击破门。"},
+        {scene:"控分剧本", score:"1-0", weight:18, use:"防守保护", note:"领先后降速控分。"},
+        {scene:"爆点剧本", score:"3-1", weight:14, use:"爆点小仓", note:"早进球后扩大比分。"},
+        {scene:"防平保护", score:"1-1", weight:12, use:"冷门保护", note:"热门过热时防平。"},
+        {scene:"极端冷门", score:"0-1", weight:6, use:"极小仓", note:"极端冷门保护。"}
+      ];
+    }
+    return [
+      {scene:"主剧本", score:"1-1", weight:28, use:"主仓候选", note:"均势基础模型优先防平。"},
+      {scene:"小胜剧本", score:"2-1", weight:22, use:"二仓候选", note:"一方压制质量提升后的比分。"},
+      {scene:"防守剧本", score:"1-0", weight:18, use:"防守保护", note:"低节奏下的一球差。"},
+      {scene:"反击剧本", score:"0-1", weight:15, use:"反击小仓", note:"弱势方反击偷胜。"},
+      {scene:"爆点剧本", score:"2-2", weight:9, use:"爆点小仓", note:"开放局保护。"},
+      {scene:"冷门剧本", score:"0-0", weight:8, use:"冷门保护", note:"闷局保护。"}
+    ];
+  }
+
+  function boost(rows, score, delta, note){
+    let r = rows.find(x => x.score === score);
+    if(!r){
+      r = {scene:"模型修正", score, weight:Math.max(2,delta), use:"修正保护", note: note || "输入项修正新增。"};
+      rows.push(r);
+    }else{
+      r.weight += delta;
+      if(note && !r.note.includes(note)) r.note += " " + note;
+    }
+  }
+
+  function buildRowsV51(){
+    let rows = baseRows().map(x => Object.assign({}, x));
+    const city = val("weatherCity");
+    const nature = val("matchNature");
+    const relation = val("teamRelation");
+    const market = val("marketHeat");
+    const weather = val("weatherImpact");
+    const coach = val("coachIntent");
+    const lineup = val("lineupStatus");
+    const stamina = val("scheduleFatigue");
+    const ref = val("refStyle"), refRel = val("refRelation"), card = val("cardRisk"), varRisk = val("varRisk");
+    const prob = getManualProb();
+
+    if(city){
+      if(/Mexico|墨西哥/i.test(city)){ boost(rows,"1-1",4,"城市/高海拔修正。"); boost(rows,"1-0",3,"城市环境降低节奏。"); }
+      if(/Miami|迈阿密/i.test(city)){ boost(rows,"1-1",4,"湿热环境修正。"); boost(rows,"0-0",3,"湿热增加低比分保护。"); }
+    }
+
+    if(hasReal(nature)){
+      if(nature.includes("小组")){ boost(rows,"1-1",5,"小组赛谨慎修正。"); boost(rows,"0-0",3,"小组赛低风险保护。"); }
+      if(nature.includes("淘汰") || nature.includes("决赛")){ boost(rows,"1-0",4,"淘汰赛保守修正。"); boost(rows,"2-1",3,"淘汰赛后段爆点。"); }
+    }
+
+    if(hasReal(market)){
+      if(market.includes("热") || market.includes("过热")){ boost(rows,"1-1",5,"热门过热防平修正。"); boost(rows,"0-1",3,"热门过热防冷修正。"); }
+      if(market.includes("冷")){ boost(rows,"2-1",4,"冷门热反向修正。"); boost(rows,"2-0",3,"冷门热下热门反打保护。"); }
+    }
+
+    if(hasReal(weather)){
+      if(weather.includes("雨") || weather.includes("风") || weather.includes("高") || weather.includes("热")){
+        boost(rows,"1-1",6,"天气降低传控/射门稳定性。");
+        boost(rows,"1-0",5,"天气不利提高一球差。");
+        boost(rows,"0-0",4,"天气不利提高闷局保护。");
+        boost(rows,"2-2",-4,"天气不利降低开放大比分。");
+      }
+    }
+
+    if(hasReal(coach)){
+      if(coach.includes("轮换") || coach.includes("保护") || coach.includes("保守") || coach.includes("控")){
+        boost(rows,"1-1",6,"教练轮换/保守修正。");
+        boost(rows,"1-0",5,"教练控分修正。");
+        boost(rows,"2-1",-2,"轮换降低进攻连续性。");
+      }
+      if(coach.includes("争胜") || coach.includes("抢分") || coach.includes("必须")){
+        boost(rows,"2-1",5,"教练争胜修正。");
+        boost(rows,"3-1",4,"进攻投入提高爆点。");
+        boost(rows,"0-0",-5,"争胜降低闷局。");
+      }
+    }
+
+    if(hasReal(lineup)){
+      if(lineup.includes("关键伤停") || lineup.includes("伤")){
+        boost(rows,"1-1",6,"关键伤停削弱主线。");
+        boost(rows,"0-1",4,"关键伤停提高冷门。");
+        boost(rows,"1-0",3,"关键伤停压低进攻效率。");
+        boost(rows,"2-0",-5,"伤停降低穿盘稳定性。");
+      }
+      if(lineup.includes("完整") || lineup.includes("主力齐")){
+        boost(rows,"2-1",4,"阵容完整提高主线。");
+        boost(rows,"2-0",4,"阵容完整提高穿盘。");
+      }
+    }
+
+    if(hasReal(stamina)){
+      if(stamina.includes("占优")){
+        boost(rows,"2-1",5,"体能占优提高后段进球。");
+        boost(rows,"1-0",3,"体能占优利于守住优势。");
+      }
+      if(stamina.includes("疲") || stamina.includes("劣") || stamina.includes("长途") || stamina.includes("跨")){
+        boost(rows,"1-1",5,"体能不利提高平局。");
+        boost(rows,"0-1",4,"体能不利提高被反击。");
+      }
+    }
+
+    if(refActive()){
+      if(ref.includes("严") || card.includes("高") || varRisk.includes("高") || varRisk.includes("多") || ref.includes("点球")){
+        boost(rows,"2-1",6,"裁判红牌/VAR/点球修正。");
+        boost(rows,"2-2",4,"裁判爆点提高开放比分。");
+        boost(rows,"0-0",-4,"裁判爆点降低闷局。");
+      }
+      if(refRel.includes("弱")) boost(rows,"0-1",5,"裁判关系偏弱势方。");
+      if(refRel.includes("强") || refRel.includes("热门")) boost(rows,"2-0",5,"裁判关系偏热门方。");
+    }
+
+    if(prob.home || prob.draw || prob.away){
+      if(prob.home >= Math.max(prob.draw, prob.away) && prob.home){ boost(rows,"2-1",5,"真实概率主胜倾向。"); boost(rows,"1-0",3,"真实概率主胜保护。"); }
+      if(prob.draw >= Math.max(prob.home, prob.away) && prob.draw){ boost(rows,"1-1",7,"真实概率平局倾向。"); boost(rows,"0-0",4,"真实概率平局保护。"); }
+      if(prob.away >= Math.max(prob.home, prob.draw) && prob.away){ boost(rows,"0-1",6,"真实概率客胜倾向。"); boost(rows,"1-2",4,"真实概率客胜保护。"); }
+    }
+
+    rows.forEach(r => r.weight = Math.max(2, r.weight));
+    rows.sort((a,b)=>b.weight-a.weight);
+    rows = rows.slice(0,6);
+    const total = rows.reduce((s,r)=>s+r.weight,0) || 1;
+    rows = rows.map(r => { r.weight = Math.max(3, Math.round(r.weight/total*100)); return r; });
+    window.JAX_SCORELINES = rows;
+    window.currentScorelines = rows;
+    return rows;
+  }
+
+  function renderAnalysisV51(rows){
+    const box = el("analysisResult");
+    if(!box) return;
+    const match = selectedMatchName() || "已选比赛";
+    const impacts = inputImpactList();
+    box.innerHTML =
+      "<h3>完整模型分析结果</h3>" +
+      "<p><b>" + match + "</b></p>" +
+      "<ul>" + impacts.map(x=>"<li>"+x+"</li>").join("") +
+      "<li>当前主线比分：<b>" + rows[0].score + "</b>；保护比分：<b>" + rows[1].score + "</b>、<b>" + rows[2].score + "</b>。</li>" +
+      "<li>所有保留输入项都已纳入修正；若某项长期不需要，应直接删除，而不是保留为摆设。</li>" +
+      "</ul><p class='small'>V5.1 全输入影响已执行：" + new Date().toLocaleTimeString() + "</p>";
+  }
+
+  function renderScoreTable(rows){
+    const table = el("modelScoreTable");
+    if(!table) return;
+    const tb = table.querySelector("tbody");
+    if(!tb) return;
+    tb.innerHTML = rows.map((s,i)=>"<tr><td>"+(i+1)+"</td><td>"+s.scene+"</td><td><b>"+s.score+"</b></td><td>"+s.weight+"%</td><td>"+s.use+"</td><td>"+s.note+"</td></tr>").join("");
+  }
+
+  function quickTable(){ return el("inlineDutchTable") || el("quickDutchTable"); }
+  function quickResult(){ return el("inlineDutchResult") || el("quickDutchResult"); }
+  function oddsMap(){
+    const table = quickTable(), map = {};
+    if(!table) return map;
+    Array.from(table.querySelectorAll("tbody tr")).forEach(tr=>{
+      const ins = tr.querySelectorAll("input");
+      if(ins.length >= 4 && ins[1].value.trim()) map[ins[1].value.trim()] = ins[3].value.trim();
+    });
+    return map;
+  }
+  function renderQuick(rows){
+    const table = quickTable();
+    if(!table) return;
+    const tb = table.querySelector("tbody");
+    if(!tb) return;
+    const old = oddsMap();
+    tb.innerHTML = rows.map(s=>"<tr><td><input value='"+s.scene+"' /></td><td><input value='"+s.score+"' /></td><td><input type='number' step='0.1' value='"+s.weight+"' /></td><td><input type='number' step='0.01' value='"+(old[s.score]||"")+"' placeholder='填赔率' /></td><td class='jaxSuggestAmt'></td><td class='jaxHitReturn'></td></tr>").join("");
+  }
+
+  function analyzeV51(){
+    const match = selectedMatchName();
+    if(!match){ const box=el("analysisResult"); if(box) box.innerHTML="请先选择比赛。"; return false; }
+    const rows = buildRowsV51();
+    renderAnalysisV51(rows);
+    renderScoreTable(rows);
+    renderQuick(rows);
+    const r = quickResult();
+    if(r) r.innerHTML = "已按所有保留输入项重新修正比分池，并保留同比分已填赔率。";
+    return false;
+  }
+
+  window.jaxStableAnalyze = analyzeV51;
+  window.jaxForceAnalyze = analyzeV51;
+  window.jaxFullAnalyze = analyzeV51;
+
+  // Dutching history
+  function readDutchTotalPage(){
+    const budget = val("dutchBudget") || val("inlineDutchBank") || val("quickDutchBank") || "";
+    const table = el("dutchTable") || quickTable();
+    const rows = [];
+    if(table){
+      Array.from(table.querySelectorAll("tbody tr")).forEach(tr=>{
+        const ins = tr.querySelectorAll("input");
+        if(ins.length >= 3){
+          rows.push({
+            item: ins[0]?.value || "",
+            odds: ins[1]?.value || ins[3]?.value || "",
+            weight: ins[2]?.value || "",
+            scene: ins[0]?.value || ""
+          });
+        }
+      });
+    }
+    return {budget, rows, result:(el("dutchResult")||quickResult()||{}).innerText || "", time:new Date().toLocaleString()};
+  }
+  window.jaxSaveDutchHistory = function(){
+    const arr = JSON.parse(localStorage.getItem(LS_DUTCH_HISTORY) || "[]");
+    arr.unshift(readDutchTotalPage());
+    localStorage.setItem(LS_DUTCH_HISTORY, JSON.stringify(arr.slice(0,100)));
+    jaxRenderDutchHistory();
+  };
+  window.jaxRenderDutchHistory = function(){
+    const box = el("dutchHistoryList");
+    if(!box) return;
+    const arr = JSON.parse(localStorage.getItem(LS_DUTCH_HISTORY) || "[]");
+    if(!arr.length){ box.innerHTML = "暂无历史记录。"; return; }
+    box.innerHTML = arr.map((x,i)=>"<div class='historyItem'><details><summary>"+x.time+"｜预算："+(x.budget||"-")+"｜"+x.rows.length+"项</summary><div class='historyDetail'>"+JSON.stringify(x,null,2)+"</div></details></div>").join("");
+  };
+  window.jaxClearDutchHistory = function(){
+    if(confirm("确定清空 Dutching 历史？")){ localStorage.removeItem(LS_DUTCH_HISTORY); jaxRenderDutchHistory(); }
+  };
+
+  // Review history
+  function readReviewPage(){
+    const data = {};
+    ["reviewMatch","reviewScore","reviewBet","reviewResult","reviewNote","noteMatch","noteType","noteLevel","noteText"].forEach(id=>{
+      const x = el(id);
+      if(x) data[id] = x.value || x.innerText || "";
+    });
+    data.pageText = (document.querySelector("#review") || {}).innerText || "";
+    data.time = new Date().toLocaleString();
+    return data;
+  }
+  window.jaxSaveReviewHistory = function(){
+    const arr = JSON.parse(localStorage.getItem(LS_REVIEW_HISTORY) || "[]");
+    arr.unshift(readReviewPage());
+    localStorage.setItem(LS_REVIEW_HISTORY, JSON.stringify(arr.slice(0,100)));
+    jaxRenderReviewHistory();
+  };
+  window.jaxRenderReviewHistory = function(){
+    const box = el("reviewHistoryList");
+    if(!box) return;
+    const arr = JSON.parse(localStorage.getItem(LS_REVIEW_HISTORY) || "[]");
+    if(!arr.length){ box.innerHTML = "暂无复盘历史。"; return; }
+    box.innerHTML = arr.map((x,i)=>"<div class='historyItem'><details><summary>"+x.time+"｜"+(x.reviewMatch||x.noteMatch||"赛后复盘")+"</summary><div class='historyDetail'>"+JSON.stringify(x,null,2)+"</div></details></div>").join("");
+  };
+  window.jaxClearReviewHistory = function(){
+    if(confirm("确定清空赛后复盘历史？")){ localStorage.removeItem(LS_REVIEW_HISTORY); jaxRenderReviewHistory(); }
+  };
+
+  window.addEventListener("DOMContentLoaded", function(){
+    Array.from(document.querySelectorAll("button")).forEach(btn=>{
+      const t = (btn.innerText||"").trim();
+      if(t.includes("按完整模型重新分析")){ btn.type="button"; btn.onclick=analyzeV51; }
+      if(t.includes("保存当前 Dutching 记录")) btn.onclick = jaxSaveDutchHistory;
+      if(t.includes("查看历史记录")) btn.onclick = jaxRenderDutchHistory;
+      if(t.includes("保存当前复盘记录")) btn.onclick = jaxSaveReviewHistory;
+      if(t.includes("查看复盘历史")) btn.onclick = jaxRenderReviewHistory;
+    });
+    jaxRenderDutchHistory();
+    jaxRenderReviewHistory();
+  });
+})();
+
+</script>
+<script>
+
+/* V5.2 API odds detail + correct input-id impact fix */
+(function(){
+  function el(id){ return document.getElementById(id); }
+  function valId(){
+    for(var i=0;i<arguments.length;i++){
+      var x=el(arguments[i]);
+      if(x){ return (x.value || x.innerText || '').trim(); }
+    }
+    return '';
+  }
+  function setIfExists(id, value){ var x=el(id); if(x && value!==undefined && value!==null && value!=='') x.value=value; }
+  function num(v){ var n=parseFloat(String(v||'').replace(/[^\d.\-]/g,'')); return isFinite(n)?n:0; }
+  function fmt(n){ return isFinite(n) ? Number(n).toFixed(2) : '-'; }
+  function pct(n){ return isFinite(n) ? Number(n).toFixed(1)+'%' : '-'; }
+  function hasReal(v){
+    if(!v) return false;
+    if(v==='normal'||v==='neutral'||v==='unknown'||v==='low'||v==='balanced') return false;
+    if(v.indexOf('正常')!==-1) return false;
+    if(v.indexOf('未知')!==-1) return false;
+    if(v.indexOf('中性')!==-1) return false;
+    return true;
+  }
+  function getSelectedEventSafe(){
+    try{ if(typeof selectedEvent !== 'undefined' && selectedEvent) return selectedEvent; }catch(e){}
+    if(window.selectedEvent) return window.selectedEvent;
+    return null;
+  }
+  function selectedMatchName(){
+    var ev=getSelectedEventSafe();
+    if(ev){
+      if(ev.home_team && ev.away_team) return ev.home_team + ' vs ' + ev.away_team;
+      return ev.title || ev.name || ev.sport_title || '已选比赛';
+    }
+    var text=document.body.innerText||'';
+    var m=text.match(/已选择：\s*([^\n]+)/);
+    return m&&m[1]?m[1].trim():'';
+  }
+  function collectMarketsV52(ev){
+    var out={h2h:[],totals:[],spreads:[],outrights:[]};
+    (ev&&ev.bookmakers||[]).forEach(function(b){
+      (b.markets||[]).forEach(function(m){
+        if(out[m.key]) out[m.key].push({book:b.title||b.key||'book', outcomes:m.outcomes||[]});
+      });
+    });
+    return out;
+  }
+  function normName(s){ return String(s||'').trim().toLowerCase(); }
+  function h2hSummary(ev){
+    var mk=collectMarketsV52(ev).h2h, home=ev&&ev.home_team||'Home', away=ev&&ev.away_team||'Away';
+    var buckets={home:[],draw:[],away:[]};
+    mk.forEach(function(mm){
+      (mm.outcomes||[]).forEach(function(o){
+        var n=normName(o.name);
+        var item={book:mm.book, name:o.name, price:num(o.price)};
+        if(!item.price) return;
+        if(n===normName(home)) buckets.home.push(item);
+        else if(n==='draw'||n==='平'||n==='平局') buckets.draw.push(item);
+        else if(n===normName(away)) buckets.away.push(item);
+      });
+    });
+    function best(arr){ return arr.length?arr.slice().sort(function(a,b){return b.price-a.price;})[0]:null; }
+    function avg(arr){ return arr.length?arr.reduce(function(s,x){return s+x.price;},0)/arr.length:NaN; }
+    var avgHome=avg(buckets.home), avgDraw=avg(buckets.draw), avgAway=avg(buckets.away);
+    var invs=[avgHome,avgDraw,avgAway].map(function(x){return x>1?1/x:0;});
+    var sum=invs.reduce(function(a,b){return a+b;},0)||1;
+    return {
+      home:home, away:away, buckets:buckets,
+      avgHome:avgHome, avgDraw:avgDraw, avgAway:avgAway,
+      bestHome:best(buckets.home), bestDraw:best(buckets.draw), bestAway:best(buckets.away),
+      pHome:invs[0]/sum*100, pDraw:invs[1]/sum*100, pAway:invs[2]/sum*100,
+      overround:(sum-1)*100
+    };
+  }
+  function groupMarket(marketRows, keyFn){
+    var map={};
+    marketRows.forEach(function(mm){
+      (mm.outcomes||[]).forEach(function(o){
+        var k=keyFn(o);
+        if(!k) return;
+        if(!map[k]) map[k]=[];
+        map[k].push({book:mm.book,name:o.name,price:num(o.price),point:o.point});
+      });
+    });
+    return Object.keys(map).map(function(k){
+      var arr=map[k].filter(function(x){return x.price>1;});
+      arr.sort(function(a,b){return b.price-a.price;});
+      var avg=arr.length?arr.reduce(function(s,x){return s+x.price;},0)/arr.length:NaN;
+      return {key:k, avg:avg, best:arr[0]||null, count:arr.length};
+    }).sort(function(a,b){ return String(a.key).localeCompare(String(b.key)); });
+  }
+  function renderRows(rows){
+    if(!rows.length) return '<p class="small">暂无此类盘口。可能该赛事/地区/博彩公司未提供。</p>';
+    return '<table class="apiMiniTable"><thead><tr><th>盘口</th><th>均值</th><th>最高赔率</th><th>公司</th><th>数量</th></tr></thead><tbody>'+rows.slice(0,12).map(function(r){
+      return '<tr><td>'+r.key+'</td><td>'+fmt(r.avg)+'</td><td>'+(r.best?fmt(r.best.price):'-')+'</td><td>'+(r.best?r.best.book:'-')+'</td><td>'+r.count+'</td></tr>';
+    }).join('')+'</tbody></table>';
+  }
+  window.jaxRenderApiOddsDetails=function(){
+    var box=el('apiOddsDetails');
+    if(!box) return false;
+    var ev=getSelectedEventSafe();
+    if(!ev){ box.innerHTML='请先选择一场比赛。'; return false; }
+    if(!ev.bookmakers || !ev.bookmakers.length){ box.innerHTML='这场比赛当前没有返回博彩公司赔率。'; return false; }
+    var markets=collectMarketsV52(ev), h=h2hSummary(ev);
+    var totalRows=groupMarket(markets.totals,function(o){ return (o.name||'') + ' ' + (o.point!=null?o.point:''); });
+    var spreadRows=groupMarket(markets.spreads,function(o){ return (o.name||'') + ' ' + (o.point!=null?(Number(o.point)>0?'+':'')+o.point:''); });
+    var hTable='<table class="apiMiniTable"><thead><tr><th>方向</th><th>均值赔率</th><th>最高赔率</th><th>最高公司</th><th>模型隐含概率</th></tr></thead><tbody>'+
+      '<tr><td>'+h.home+'</td><td>'+fmt(h.avgHome)+'</td><td>'+(h.bestHome?fmt(h.bestHome.price):'-')+'</td><td>'+(h.bestHome?h.bestHome.book:'-')+'</td><td>'+pct(h.pHome)+'</td></tr>'+
+      '<tr><td>平局</td><td>'+fmt(h.avgDraw)+'</td><td>'+(h.bestDraw?fmt(h.bestDraw.price):'-')+'</td><td>'+(h.bestDraw?h.bestDraw.book:'-')+'</td><td>'+pct(h.pDraw)+'</td></tr>'+
+      '<tr><td>'+h.away+'</td><td>'+fmt(h.avgAway)+'</td><td>'+(h.bestAway?fmt(h.bestAway.price):'-')+'</td><td>'+(h.bestAway?h.bestAway.book:'-')+'</td><td>'+pct(h.pAway)+'</td></tr>'+
+      '</tbody></table>';
+    var notes=[];
+    if(isFinite(h.overround)) notes.push('胜平负平均返还率/水差估算：'+pct(h.overround)+'，越高说明公司水差越大。');
+    if(h.pHome>50) notes.push('API隐含概率显示主队为明显热门。');
+    else if(h.pAway>50) notes.push('API隐含概率显示客队为明显热门。');
+    else if(h.pDraw>30) notes.push('平局隐含概率偏高，模型应加强防平/低比分保护。');
+    box.innerHTML='<div class="apiOddsGrid">'+
+      '<div class="apiOddsCard"><h4>胜平负 H2H</h4>'+hTable+'</div>'+
+      '<div class="apiOddsCard"><h4>大小球 Totals</h4>'+renderRows(totalRows)+'</div>'+
+      '<div class="apiOddsCard"><h4>让球 Spreads</h4>'+renderRows(spreadRows)+'</div>'+
+      '</div><div class="noteBox"><b>赔率读取结论：</b><ul>'+notes.map(function(x){return '<li>'+x+'</li>';}).join('')+'<li>足球波胆赔率通常不在此API标准市场中；波胆仍建议截图OCR或手动填写。</li></ul></div>';
+    return false;
+  };
+  window.jaxImportApiOddsToModel=function(){
+    var ev=getSelectedEventSafe();
+    if(!ev){ alert('请先选择比赛。'); return false; }
+    var h=h2hSummary(ev);
+    if(!isFinite(h.pHome)||!isFinite(h.pDraw)||!isFinite(h.pAway)){ alert('没有可用胜平负赔率。'); return false; }
+    setIfExists('modelHomeP', h.pHome.toFixed(1));
+    setIfExists('modelDrawP', h.pDraw.toFixed(1));
+    setIfExists('modelAwayP', h.pAway.toFixed(1));
+    var power=el('powerGap');
+    if(power){
+      var max=Math.max(h.pHome,h.pAway), min=Math.min(h.pHome,h.pAway);
+      if(max-min<8) power.value='balanced';
+      else if(max-min<18) power.value='favorite_small';
+      else if(max-min<30) power.value='favorite_big';
+      else power.value='mismatch';
+    }
+    var heat=el('marketHeat');
+    if(heat){
+      if(Math.max(h.pHome,h.pAway)>62) heat.value='hot_fav';
+      else if(h.pDraw>31) heat.value='cold_pull';
+      else heat.value='normal';
+    }
+    jaxRenderApiOddsDetails();
+    if(typeof window.jaxStableAnalyze==='function') window.jaxStableAnalyze();
+    return false;
+  };
+
+  // Correct input-ID aware analysis override
+  function getProb(){ return {home:num(valId('modelHomeP','trueHomeProb','manualHomeProb')), draw:num(valId('modelDrawP','trueDrawProb','manualDrawProb')), away:num(valId('modelAwayP','trueAwayProb','manualAwayProb'))}; }
+  function boost(rows, score, delta, note){
+    var r=rows.find(function(x){return x.score===score;});
+    if(!r){ r={scene:'模型修正',score:score,weight:Math.max(2,delta),use:'修正保护',note:note||'输入项修正'}; rows.push(r); }
+    else{ r.weight+=delta; if(note && r.note.indexOf(note)===-1) r.note+=' '+note; }
+  }
+  function buildRows(){
+    var relation=valId('powerGap','teamRelation'), nature=valId('matchType','matchNature'), market=valId('marketHeat'), weather=valId('weatherImpact'), coach=valId('coachIntent'), lineup=valId('lineupState','lineupStatus'), fatigue=valId('fatigue','scheduleFatigue'), ref=valId('refStrict','refStyle'), refRel=valId('refRelation'), card=valId('cardRisk'), varRisk=valId('varRisk'), city=valId('weatherCity');
+    var rows = (relation==='favorite_big'||relation==='mismatch'||relation.indexOf('强')!==-1) ? [
+      {scene:'强队主剧本',score:'2-0',weight:28,use:'主仓候选',note:'强弱关系影响强队零封。'}, {scene:'小胜剧本',score:'2-1',weight:22,use:'二仓候选',note:'强队赢但被反击。'}, {scene:'控分剧本',score:'1-0',weight:18,use:'防守保护',note:'领先后降速。'}, {scene:'爆点剧本',score:'3-1',weight:14,use:'爆点小仓',note:'早进球扩大。'}, {scene:'防平保护',score:'1-1',weight:12,use:'冷门保护',note:'热门过热防平。'}, {scene:'极端冷门',score:'0-1',weight:6,use:'极小仓',note:'极端风险。'}
+    ] : [
+      {scene:'主剧本',score:'1-1',weight:28,use:'主仓候选',note:'均势基础模型防平。'}, {scene:'小胜剧本',score:'2-1',weight:22,use:'二仓候选',note:'压制质量提升。'}, {scene:'防守剧本',score:'1-0',weight:18,use:'防守保护',note:'低节奏一球差。'}, {scene:'反击剧本',score:'0-1',weight:15,use:'反击小仓',note:'弱势反击。'}, {scene:'爆点剧本',score:'2-2',weight:9,use:'爆点小仓',note:'开放局保护。'}, {scene:'冷门剧本',score:'0-0',weight:8,use:'冷门保护',note:'闷局保护。'}
+    ];
+    if(city && /Mexico|墨西哥/i.test(city)){ boost(rows,'1-1',4,'高海拔/城市环境修正。'); boost(rows,'1-0',3,'高海拔降低节奏。'); }
+    if(city && /Miami|迈阿密/i.test(city)){ boost(rows,'1-1',4,'湿热环境修正。'); boost(rows,'0-0',3,'湿热低比分保护。'); }
+    if(nature==='worldcup_group'||nature.indexOf('小组')!==-1){ boost(rows,'1-1',5,'小组赛谨慎。'); boost(rows,'0-0',3,'小组赛低风险。'); }
+    if(nature==='worldcup_knockout'||nature.indexOf('淘汰')!==-1){ boost(rows,'1-0',4,'淘汰赛保守。'); boost(rows,'2-1',3,'淘汰赛后段爆点。'); }
+    if(market==='hot_fav'||market.indexOf('过热')!==-1){ boost(rows,'1-1',5,'热门过热防平。'); boost(rows,'0-1',3,'热门过热防冷。'); }
+    if(market==='cold_pull'||market.indexOf('冷')!==-1){ boost(rows,'2-1',4,'冷门拉力反向修正。'); boost(rows,'2-0',3,'热门反打保护。'); }
+    if(['rain','wind','heat','humid','altitude'].indexOf(weather)!==-1 || /雨|风|热|海拔/.test(weather)){ boost(rows,'1-1',6,'天气降低传控/射门稳定性。'); boost(rows,'1-0',5,'天气提高一球差。'); boost(rows,'0-0',4,'天气提高闷局保护。'); boost(rows,'2-2',-4,'天气降低开放大比分。'); }
+    if(['rotate','control'].indexOf(coach)!==-1 || /轮换|保护|保守|控/.test(coach)){ boost(rows,'1-1',6,'教练轮换/保守。'); boost(rows,'1-0',5,'教练控分。'); boost(rows,'2-1',-2,'进攻连续性下降。'); }
+    if(['full_attack','must_win'].indexOf(coach)!==-1 || /争胜|抢分|必须/.test(coach)){ boost(rows,'2-1',5,'教练争胜。'); boost(rows,'3-1',4,'进攻投入提高。'); boost(rows,'0-0',-5,'争胜降低闷局。'); }
+    if(lineup==='injury'||/关键伤停|伤/.test(lineup)){ boost(rows,'1-1',6,'关键伤停削弱主线。'); boost(rows,'0-1',4,'关键伤停提高冷门。'); boost(rows,'1-0',3,'关键伤停压低进攻。'); boost(rows,'2-0',-5,'伤停降低穿盘。'); }
+    if(lineup==='strong'||/完整|主力齐/.test(lineup)){ boost(rows,'2-1',4,'阵容完整提高主线。'); boost(rows,'2-0',4,'阵容完整提高穿盘。'); }
+    if(fatigue==='advantage'||/占优/.test(fatigue)){ boost(rows,'2-1',5,'体能占优提高后段进球。'); boost(rows,'1-0',3,'体能占优利于守住优势。'); }
+    if(['travel','short_rest'].indexOf(fatigue)!==-1 || /疲|劣|长途|跨/.test(fatigue)){ boost(rows,'1-1',5,'体能不利提高平局。'); boost(rows,'0-1',4,'体能不利提高被反击。'); }
+    if(hasReal(ref)||hasReal(refRel)||hasReal(card)||hasReal(varRisk)){ if(/严|高|多|点球|VAR/.test(ref+card+varRisk)){ boost(rows,'2-1',6,'裁判红牌/VAR/点球修正。'); boost(rows,'2-2',4,'裁判爆点提高开放比分。'); boost(rows,'0-0',-4,'裁判爆点降低闷局。'); } if(/弱/.test(refRel)) boost(rows,'0-1',5,'裁判关系偏弱势方。'); if(/强|热门/.test(refRel)) boost(rows,'2-0',5,'裁判关系偏热门方。'); }
+    var p=getProb(); if(p.home||p.draw||p.away){ if(p.home>=Math.max(p.draw,p.away)&&p.home){boost(rows,'2-1',5,'API/真实概率主胜倾向。'); boost(rows,'1-0',3,'主胜保护。');} if(p.draw>=Math.max(p.home,p.away)&&p.draw){boost(rows,'1-1',7,'API/真实概率平局倾向。'); boost(rows,'0-0',4,'平局保护。');} if(p.away>=Math.max(p.home,p.draw)&&p.away){boost(rows,'0-1',6,'API/真实概率客胜倾向。'); boost(rows,'1-2',4,'客胜保护。');} }
+    rows.forEach(function(r){ r.weight=Math.max(2,r.weight); }); rows.sort(function(a,b){return b.weight-a.weight;}); rows=rows.slice(0,6); var total=rows.reduce(function(s,r){return s+r.weight;},0)||1; rows=rows.map(function(r){r.weight=Math.max(3,Math.round(r.weight/total*100));return r;}); window.JAX_SCORELINES=rows; window.currentScorelines=rows; return rows;
+  }
+  function renderAnalysis(rows){
+    var box=el('analysisResult'); if(!box) return; var oddsLine=''; var ev=getSelectedEventSafe(); if(ev&&ev.bookmakers&&ev.bookmakers.length){ var h=h2hSummary(ev); oddsLine='<li>API赔率已读取：'+h.buckets.home.length+'组主胜、'+h.buckets.draw.length+'组平局、'+h.buckets.away.length+'组客胜；可点击“把API胜平负概率带入模型”。</li>'; }
+    var impacts=['天气城市：'+(valId('weatherCity')||'未填'), '比赛性质：'+valId('matchType','matchNature'), '强弱关系：'+valId('powerGap','teamRelation'), '盘口热度：'+valId('marketHeat'), '天气影响：'+valId('weatherImpact'), '教练目的：'+valId('coachIntent'), '阵容状态：'+valId('lineupState','lineupStatus'), '赛程体能：'+valId('fatigue','scheduleFatigue'), '裁判因素：'+[valId('refStrict','refStyle'),valId('refRelation'),valId('cardRisk'),valId('varRisk')].filter(Boolean).join(' / '), '真实/API概率：主 '+(valId('modelHomeP')||'-')+'%，平 '+(valId('modelDrawP')||'-')+'%，客 '+(valId('modelAwayP')||'-')+'%'];
+    box.innerHTML='<h3>完整模型分析结果</h3><p><b>'+ (selectedMatchName()||'已选比赛') +'</b></p><ul>'+impacts.map(function(x){return '<li>'+x+' 已纳入模型修正。</li>';}).join('')+oddsLine+'<li>当前主线比分：<b>'+rows[0].score+'</b>；保护比分：<b>'+rows[1].score+'</b>、<b>'+rows[2].score+'</b>。</li></ul><p class="small">V5.2 API赔率+全输入修正已执行：'+new Date().toLocaleTimeString()+'</p>';
+  }
+  function renderScoreTable(rows){ var table=el('modelScoreTable'); if(!table) return; var tb=table.querySelector('tbody'); if(!tb) return; tb.innerHTML=rows.map(function(s,i){return '<tr><td>'+(i+1)+'</td><td>'+s.scene+'</td><td><b>'+s.score+'</b></td><td>'+s.weight+'%</td><td>'+s.use+'</td><td>'+s.note+'</td></tr>';}).join(''); }
+  function quickTable(){return el('inlineDutchTable')||el('quickDutchTable');}
+  function quickResult(){return el('inlineDutchResult')||el('quickDutchResult');}
+  function oddsMap(){ var table=quickTable(), map={}; if(!table)return map; Array.from(table.querySelectorAll('tbody tr')).forEach(function(tr){var ins=tr.querySelectorAll('input'); if(ins.length>=4&&ins[1].value.trim())map[ins[1].value.trim()]=ins[3].value.trim();}); return map; }
+  function renderQuick(rows){ var table=quickTable(); if(!table)return; var tb=table.querySelector('tbody'); if(!tb)return; var old=oddsMap(); tb.innerHTML=rows.map(function(s){return '<tr><td><input value="'+s.scene+'" /></td><td><input value="'+s.score+'" /></td><td><input type="number" step="0.1" value="'+s.weight+'" /></td><td><input type="number" step="0.01" value="'+(old[s.score]||'')+'" placeholder="填赔率" /></td><td class="jaxSuggestAmt"></td><td class="jaxHitReturn"></td></tr>';}).join(''); }
+  function analyze(){ var match=selectedMatchName(); if(!match){var b=el('analysisResult'); if(b)b.innerHTML='请先选择比赛。'; return false;} var rows=buildRows(); renderAnalysis(rows); renderScoreTable(rows); renderQuick(rows); var r=quickResult(); if(r)r.innerHTML='已按API赔率和所有保留输入项重新修正比分池，并保留同比分已填赔率。'; return false; }
+  window.jaxStableAnalyze=analyze; window.jaxForceAnalyze=analyze; window.jaxFullAnalyze=analyze;
+  window.addEventListener('DOMContentLoaded',function(){
+    var oldSelect=window.selectEvent; if(typeof oldSelect==='function'&&!window.__jaxSelectWrappedV52){ window.__jaxSelectWrappedV52=true; window.selectEvent=function(i,node){ var res=oldSelect(i,node); setTimeout(function(){jaxRenderApiOddsDetails();},0); return res; }; }
+    Array.from(document.querySelectorAll('button')).forEach(function(btn){ var t=(btn.innerText||'').trim(); if(t.indexOf('按完整模型重新分析')!==-1){btn.type='button'; btn.onclick=analyze;} });
+    setTimeout(function(){ if(getSelectedEventSafe()) jaxRenderApiOddsDetails(); },300);
+  });
+})();
+
+</script>
+<script>
+
+/* V5.3 total Dutching AI weight + ROI
+   总页 Dutching 逻辑：
+   用户只需要填 结果/比分 + 赔率 + 总预算。
+   AI自动计算模型权重；Dutching按选择模式计算金额、命中回报、净利润、ROI。
+*/
+(function(){
+  const LS_DUTCH_HISTORY = "jax_dutch_history_v53";
+  window.JAX_LAST_TOTAL_DUTCH = window.JAX_LAST_TOTAL_DUTCH || null;
+
+  function el(id){ return document.getElementById(id); }
+  function val(id){
+    const x = el(id);
+    if(!x) return "";
+    return (x.value || x.innerText || "").trim();
+  }
+  function num(v){
+    const n = parseFloat(String(v||"").replace(/[^\d.\-]/g,""));
+    return isFinite(n) ? n : 0;
+  }
+  function fmt(n){ return Number(n||0).toFixed(2); }
+  function pct(n){ return Number(n||0).toFixed(1) + "%"; }
+
+  function parseScore(score){
+    const m = String(score||"").match(/(\d{1,2})\s*[-:]\s*(\d{1,2})/);
+    if(!m) return null;
+    const h = parseInt(m[1],10), a = parseInt(m[2],10);
+    return {h,a,total:h+a,diff:h-a};
+  }
+
+  function hasReal(v){
+    if(!v) return false;
+    if(v.includes("正常")) return false;
+    if(v.includes("未知")) return false;
+    if(v.includes("中性")) return false;
+    if(v.includes("不触发")) return false;
+    return true;
+  }
+
+  function inputVal(id){ return val(id); }
+
+  function getDutchBudget(){
+    const ids = ["dutchBudget", "totalDutchBudget", "dutchBank", "bankroll", "inlineDutchBank", "quickDutchBank"];
+    for(const id of ids){
+      const x = el(id);
+      if(x && num(x.value)) return num(x.value);
+    }
+    // fallback: first input under dutch section with placeholder including 1000/3000
+    const sec = el("dutch2") || document;
+    const inputs = Array.from(sec.querySelectorAll("input"));
+    for(const inp of inputs){
+      const ph = inp.getAttribute("placeholder") || "";
+      if(ph.includes("1000") || ph.includes("3000") || ph.includes("预算")){
+        const n = num(inp.value);
+        if(n) return n;
+      }
+    }
+    return 0;
+  }
+
+  function getDutchMode(){
+    const sec = el("dutch2") || document;
+    const selects = Array.from(sec.querySelectorAll("select"));
+    for(const s of selects){
+      const t = s.value || (s.options[s.selectedIndex] && s.options[s.selectedIndex].text) || "";
+      if(t.includes("Dutching") || t.includes("分配") || t.includes("保守") || t.includes("等回报") || t.includes("权重")){
+        return t;
+      }
+    }
+    return "等回报 Dutching";
+  }
+
+  function getDutchTable(){
+    return el("dutchTable") || document.querySelector("#dutch2 table") || null;
+  }
+
+  function readDutchRows(){
+    const table = getDutchTable();
+    if(!table) return [];
+    return Array.from(table.querySelectorAll("tbody tr")).map(tr=>{
+      const ins = tr.querySelectorAll("input");
+      if(ins.length < 3) return null;
+      // 总页通常：结果/比分/球队、赔率、模型权重
+      return {
+        tr,
+        item: (ins[0].value || "").trim(),
+        odds: num(ins[1].value),
+        weight: num(ins[2].value),
+        inputs: ins
+      };
+    }).filter(r => r && r.item);
+  }
+
+  function aiWeightForItem(item, odds){
+    const s = parseScore(item);
+    let w = 20;
+
+    const nature = inputVal("matchNature");
+    const relation = inputVal("teamRelation");
+    const market = inputVal("marketHeat");
+    const weather = inputVal("weatherImpact");
+    const coach = inputVal("coachIntent");
+    const lineup = inputVal("lineupStatus");
+    const stamina = inputVal("scheduleFatigue");
+    const ref = inputVal("refStyle");
+    const refRel = inputVal("refRelation");
+    const card = inputVal("cardRisk");
+    const varRisk = inputVal("varRisk");
+
+    if(s){
+      // 比分结构权重
+      if(s.total <= 1) w += 9;
+      if(s.total === 2) w += 17;
+      if(s.total === 3) w += 15;
+      if(s.total === 4) w += 8;
+      if(s.total >= 5) w -= 8;
+
+      if(s.diff === 0) w += 12;
+      if(Math.abs(s.diff) === 1) w += 11;
+      if(Math.abs(s.diff) === 2) w += 3;
+      if(Math.abs(s.diff) >= 3) w -= 5;
+
+      if(nature.includes("小组")){
+        if(s.total <= 2) w += 8;
+        if(s.diff === 0) w += 5;
+        if(s.total >= 4) w -= 5;
+      }
+
+      if(relation.includes("均势")){
+        if(s.diff === 0) w += 8;
+        if(Math.abs(s.diff) >= 2) w -= 4;
+      }else if(relation.includes("强")){
+        if(s.diff > 0 && s.diff <= 2) w += 8;
+        if(s.diff < 0) w -= 3;
+      }
+
+      if(hasReal(weather) && (weather.includes("雨") || weather.includes("风") || weather.includes("高") || weather.includes("热"))){
+        if(s.total <= 2) w += 10;
+        if(s.total >= 4) w -= 8;
+        if(s.diff === 0) w += 3;
+      }
+
+      if(hasReal(coach)){
+        if(coach.includes("轮换") || coach.includes("保护") || coach.includes("保守") || coach.includes("控")){
+          if(s.total <= 2) w += 9;
+          if(s.diff === 0 || Math.abs(s.diff) === 1) w += 5;
+          if(s.total >= 4) w -= 6;
+        }
+        if(coach.includes("争胜") || coach.includes("抢分") || coach.includes("必须")){
+          if(s.total >= 3) w += 8;
+          if(s.total <= 1) w -= 5;
+        }
+      }
+
+      if(hasReal(lineup)){
+        if(lineup.includes("关键伤停") || lineup.includes("伤")){
+          if(s.diff === 0) w += 7;
+          if(s.total <= 2) w += 5;
+          if(Math.abs(s.diff) >= 2) w -= 6;
+        }
+        if(lineup.includes("完整") || lineup.includes("主力齐")){
+          if(s.total >= 2 && s.total <= 3) w += 4;
+        }
+      }
+
+      if(hasReal(stamina)){
+        if(stamina.includes("占优")){
+          if(s.diff > 0 && s.total >= 2 && s.total <= 3) w += 6;
+        }
+        if(stamina.includes("疲") || stamina.includes("劣") || stamina.includes("长途") || stamina.includes("跨")){
+          if(s.total <= 2) w += 5;
+          if(s.diff === 0) w += 4;
+        }
+      }
+
+      const refActive = hasReal(ref) || hasReal(refRel) || hasReal(card) || hasReal(varRisk);
+      if(refActive){
+        if(ref.includes("严") || card.includes("高") || varRisk.includes("高") || varRisk.includes("多") || ref.includes("点球") || ref.includes("VAR")){
+          if(s.total >= 3) w += 8;
+          if(s.total === 0) w -= 7;
+          if(Math.abs(s.diff) === 1) w += 3;
+        }
+        if(refRel.includes("弱") && s.diff < 0) w += 8;
+        if((refRel.includes("强") || refRel.includes("热门")) && s.diff > 0) w += 6;
+      }
+    }else{
+      // 非比分，例如冠军/晋级/球队结果
+      w += 10;
+      if(item.length <= 12) w += 4;
+      if(relation.includes("强") || market.includes("热")) w += 3;
+    }
+
+    // 赔率价值修正
+    if(odds > 1){
+      if(odds < 2) w -= 3;
+      else if(odds < 4) w += 2;
+      else if(odds <= 10) w += 6;
+      else if(odds <= 25) w += 3;
+      else w -= 5;
+    }
+
+    return Math.max(1, w);
+  }
+
+  function aiCalculateTotalDutchWeights(){
+    const rows = readDutchRows();
+    const box = el("dutchResult") || document.querySelector("#dutch2 .result-box");
+    if(!rows.length){
+      if(box) box.innerHTML = "请先填写至少一个结果/比分和赔率。";
+      return false;
+    }
+    const raw = rows.map(r => aiWeightForItem(r.item, r.odds));
+    const sum = raw.reduce((a,b)=>a+b,0) || 1;
+
+    rows.forEach((r,i)=>{
+      const w = Math.round(raw[i] / sum * 100);
+      r.inputs[2].value = w;
+    });
+
+    if(box){
+      box.innerHTML =
+        "<h3>AI权重已计算</h3>" +
+        "<p>已根据比分结构、赔率价值、当前比赛模型输入项自动计算权重。你只需要输入结果/比分、赔率和预算。</p>" +
+        "<p class='small'>下一步点“计算 Dutching + ROI”。</p>";
+    }
+    return false;
+  }
+
+  function computeStakes(rows, budget, mode){
+    const arr = rows.map(r => Object.assign({}, r));
+    const valid = arr.filter(r => r.odds > 1);
+
+    if(mode.includes("等回报") && valid.length){
+      const inv = valid.reduce((s,r)=>s + 1/r.odds,0) || 1;
+      arr.forEach(r => r.stake = r.odds > 1 ? budget * (1/r.odds) / inv : 0);
+      return arr;
+    }
+
+    if(mode.includes("保守")){
+      const boosts = [1.25,1.12,1.02,0.85,0.65,0.48,0.35,0.25];
+      const total = arr.reduce((s,r,i)=>s + r.weight * (boosts[i] || 0.35),0) || 1;
+      arr.forEach((r,i)=>r.stake = budget * r.weight * (boosts[i] || 0.35) / total);
+      return arr;
+    }
+
+    const totalW = arr.reduce((s,r)=>s + r.weight,0) || 1;
+    arr.forEach(r => r.stake = budget * r.weight / totalW);
+    return arr;
+  }
+
+  function calcTotalDutchingROI(){
+    let rows = readDutchRows();
+    const box = el("dutchResult") || document.querySelector("#dutch2 .result-box");
+    if(!rows.length){
+      if(box) box.innerHTML = "请先填写结果/比分、赔率和总预算。";
+      return false;
+    }
+
+    if(rows.some(r => !r.weight || r.weight <= 0)){
+      aiCalculateTotalDutchWeights();
+      rows = readDutchRows();
+    }
+
+    const budget = getDutchBudget();
+    if(!budget){
+      if(box) box.innerHTML = "请先填写总预算。";
+      return false;
+    }
+
+    const mode = getDutchMode();
+    const computed = computeStakes(rows, budget, mode);
+    const totalStake = computed.reduce((s,r)=>s + (r.stake || 0),0);
+    const anyOdds = computed.some(r=>r.odds>1);
+
+    let bestNet = -1e18, worstNet = 1e18, bestItem = "", worstItem = "";
+    let tbody = "";
+
+    computed.forEach((r,i)=>{
+      const ret = r.odds > 1 ? r.stake * r.odds : 0;
+      const net = r.odds > 1 ? ret - totalStake : -totalStake;
+      const roi = totalStake ? net / totalStake * 100 : 0;
+      if(r.odds > 1){
+        if(net > bestNet){ bestNet = net; bestItem = r.item; }
+        if(net < worstNet){ worstNet = net; worstItem = r.item; }
+      }
+
+      // 回填原行
+      const cells = rows[i].tr.querySelectorAll("td");
+      // 总页原表通常只有4列，没有建议金额/回报列；所以只更新权重即可
+      if(rows[i].inputs[2]) rows[i].inputs[2].value = r.weight;
+
+      tbody += "<tr>" +
+        "<td><b>" + r.item + "</b></td>" +
+        "<td>" + (r.odds > 1 ? r.odds.toFixed(2) : "未填") + "</td>" +
+        "<td>" + r.weight + "%</td>" +
+        "<td><b>" + fmt(r.stake) + "</b></td>" +
+        "<td>" + (r.odds > 1 ? fmt(ret) : "-") + "</td>" +
+        "<td>" + (r.odds > 1 ? "<b>" + fmt(net) + "</b>" : "-") + "</td>" +
+        "<td>" + (r.odds > 1 ? pct(roi) : "-") + "</td>" +
+        "</tr>";
+    });
+
+    if(!box) return false;
+    if(!anyOdds){
+      box.innerHTML = "已按AI权重分配预算，但你还没填写赔率，所以无法计算回报/净利润/ROI。";
+      return false;
+    }
+
+    const html =
+      "<h3>Dutching + ROI 计算结果</h3>" +
+      "<p>分配方式：<b>" + mode + "</b>；总投入：<b>" + fmt(totalStake) + "</b>。</p>" +
+      "<table><thead><tr><th>结果/比分</th><th>赔率</th><th>AI权重</th><th>建议投注</th><th>命中回报</th><th>净利润</th><th>ROI</th></tr></thead><tbody>" +
+      tbody +
+      "</tbody></table>" +
+      "<p><b>最好命中：</b>" + bestItem + "，净利润 " + fmt(bestNet) + "；<b>最差命中：</b>" + worstItem + "，净利润 " + fmt(worstNet) + "。</p>" +
+      "<p><b>未覆盖风险：</b>如果最终结果不在这组结果里，亏损约 -" + fmt(totalStake) + "。</p>" +
+      "<p class='small'>说明：AI权重负责判断覆盖优先级；Dutching负责按赔率和预算分配资金。</p>";
+
+    box.innerHTML = html;
+
+    window.JAX_LAST_TOTAL_DUTCH = {
+      time: new Date().toLocaleString(),
+      budget,
+      mode,
+      rows: computed.map(r=>({
+        item:r.item,
+        odds:r.odds,
+        weight:r.weight,
+        stake:Number(fmt(r.stake)),
+        hitReturn:r.odds>1 ? Number(fmt(r.stake*r.odds)) : 0,
+        net:r.odds>1 ? Number(fmt(r.stake*r.odds-totalStake)) : -Number(fmt(totalStake)),
+        roi:r.odds>1 ? pct((r.stake*r.odds-totalStake)/totalStake*100) : "-"
+      })),
+      bestItem,
+      bestNet:Number(fmt(bestNet)),
+      worstItem,
+      worstNet:Number(fmt(worstNet)),
+      uncoveredRisk:-Number(fmt(totalStake)),
+      htmlText: box.innerText
+    };
+
+    return false;
+  }
+
+  // 历史保存，优先保存最新详细计算
+  window.jaxSaveDutchHistory = function(){
+    const key = "jax_dutch_history_v53";
+    const arr = JSON.parse(localStorage.getItem(key) || "[]");
+    const data = window.JAX_LAST_TOTAL_DUTCH || {
+      time: new Date().toLocaleString(),
+      budget:getDutchBudget(),
+      mode:getDutchMode(),
+      rows:readDutchRows().map(r=>({item:r.item, odds:r.odds, weight:r.weight})),
+      htmlText:(el("dutchResult")||{}).innerText || ""
+    };
+    arr.unshift(data);
+    localStorage.setItem(key, JSON.stringify(arr.slice(0,100)));
+    if(window.jaxRenderDutchHistory) window.jaxRenderDutchHistory();
+  };
+
+  window.jaxRenderDutchHistory = function(){
+    const box = el("dutchHistoryList");
+    if(!box) return;
+    const arr = JSON.parse(localStorage.getItem("jax_dutch_history_v53") || "[]");
+    if(!arr.length){ box.innerHTML = "暂无历史记录。"; return; }
+    box.innerHTML = arr.map((x,i)=>
+      "<div class='historyItem'><details><summary>"+x.time+"｜预算："+(x.budget||"-")+"｜"+(x.mode||"")+"｜"+(x.rows?x.rows.length:0)+"项</summary><div class='historyDetail'>"+JSON.stringify(x,null,2)+"</div></details></div>"
+    ).join("");
+  };
+
+  window.jaxClearDutchHistory = function(){
+    if(confirm("确定清空 Dutching 历史？")){
+      localStorage.removeItem("jax_dutch_history_v53");
+      if(window.jaxRenderDutchHistory) window.jaxRenderDutchHistory();
+    }
+  };
+
+  window.jaxAiTotalDutchWeights = aiCalculateTotalDutchWeights;
+  window.jaxCalcTotalDutchingROI = calcTotalDutchingROI;
+
+  window.addEventListener("DOMContentLoaded", function(){
+    Array.from(document.querySelectorAll("button")).forEach(btn=>{
+      const t = (btn.innerText||"").trim();
+      if(t.includes("AI计算权重") || t.includes("填入当前比分池")){
+        btn.type = "button";
+        btn.innerText = "AI计算权重";
+        btn.onclick = aiCalculateTotalDutchWeights;
+      }
+      if(t.includes("计算 Dutching")){
+        btn.type = "button";
+        btn.innerText = "计算 Dutching + ROI";
+        btn.onclick = calcTotalDutchingROI;
+      }
+      if(t.includes("保存当前 Dutching 记录")) btn.onclick = window.jaxSaveDutchHistory;
+      if(t.includes("查看历史记录")) btn.onclick = window.jaxRenderDutchHistory;
+      if(t.includes("清空历史记录")) btn.onclick = window.jaxClearDutchHistory;
+    });
+    if(window.jaxRenderDutchHistory) window.jaxRenderDutchHistory();
+  });
+})();
+
+</script>
+<script>
+
+/* V5.4 nav + history + button audit
+   1. 历史记录新增：赛事名称、比赛名称、开赛时间、保存时间、模块类型、备注、完整细节。
+   2. 最低波胆数量增加 + / - 按钮。
+   3. 检查顶部导航按钮和主要功能按钮，补齐无效onclick。
+*/
+(function(){
+  const LS_DUTCH_HISTORY = "jax_dutch_history_v54";
+  const LS_REVIEW_HISTORY = "jax_review_history_v54";
+
+  function el(id){ return document.getElementById(id); }
+  function val(id){
+    const x = el(id);
+    if(!x) return "";
+    return (x.value || x.innerText || "").trim();
+  }
+  function num(v){
+    const n = parseFloat(String(v||"").replace(/[^\d.\-]/g,""));
+    return isFinite(n) ? n : 0;
+  }
+  function fmt(n){ return Number(n||0).toFixed(2); }
+
+  function activeSportName(){
+    const sel = el("sportSelect") || el("sport") || document.querySelector("select");
+    if(sel && sel.options && sel.selectedIndex >= 0){
+      return sel.options[sel.selectedIndex].text || sel.value || "";
+    }
+    return "";
+  }
+
+  function selectedMatchInfo(){
+    let name = "";
+    let time = "";
+
+    if(window.selectedMatch){
+      if(window.selectedMatch.home_team && window.selectedMatch.away_team) name = window.selectedMatch.home_team + " vs " + window.selectedMatch.away_team;
+      else name = window.selectedMatch.title || window.selectedMatch.name || "";
+      time = window.selectedMatch.commence_time || window.selectedMatch.time || "";
+    }
+
+    const bodyText = document.body.innerText || "";
+    if(!name){
+      const m = bodyText.match(/已选择：\s*([^\n]+)/);
+      if(m && m[1]) name = m[1].trim();
+    }
+    if(!time){
+      const t = bodyText.match(/已选择：\s*[^\n]+\n\s*([0-9]{4}[\/\-][0-9]{1,2}[\/\-][0-9]{1,2}[^\n]*)/);
+      if(t && t[1]) time = t[1].trim();
+    }
+
+    return {
+      sport: activeSportName() || "未识别赛事",
+      match: name || "未选择比赛",
+      startTime: time || "未识别开赛时间",
+      savedAt: new Date().toLocaleString()
+    };
+  }
+
+  function ensureHistoryNoteInputs(){
+    const dutchBox = document.querySelector(".jaxDutchHistoryBox") || document.querySelector("#dutchHistoryList")?.parentElement;
+    if(dutchBox && !el("dutchHistoryNote")){
+      const div = document.createElement("div");
+      div.innerHTML = '<label>本次Dutching备注，可空</label><input id="dutchHistoryNote" placeholder="如：赛前方案 / 临场盘口变化 / 朋友推荐单 / 观察用" />';
+      const flex = dutchBox.querySelector(".flex");
+      if(flex) dutchBox.insertBefore(div, flex);
+      else dutchBox.insertBefore(div, dutchBox.firstChild);
+    }
+
+    const reviewBox = document.querySelector(".jaxReviewHistoryBox") || document.querySelector("#reviewHistoryList")?.parentElement;
+    if(reviewBox && !el("reviewHistoryNote")){
+      const div = document.createElement("div");
+      div.innerHTML = '<label>本次复盘备注，可空</label><input id="reviewHistoryNote" placeholder="如：赛后发现裁判漏判 / 天气估计错误 / 盘口反跳没处理" />';
+      const flex = reviewBox.querySelector(".flex");
+      if(flex) reviewBox.insertBefore(div, flex);
+      else reviewBox.insertBefore(div, reviewBox.firstChild);
+    }
+  }
+
+  function getDutchBudget(){
+    const ids = ["dutchBudget", "totalDutchBudget", "dutchBank", "bankroll", "inlineDutchBank", "quickDutchBank"];
+    for(const id of ids){
+      const x = el(id);
+      if(x && num(x.value)) return num(x.value);
+    }
+    const sec = el("dutch2") || document;
+    const inputs = Array.from(sec.querySelectorAll("input"));
+    for(const inp of inputs){
+      const ph = inp.getAttribute("placeholder") || "";
+      if(ph.includes("1000") || ph.includes("3000") || ph.includes("预算")){
+        const n = num(inp.value);
+        if(n) return n;
+      }
+    }
+    return 0;
+  }
+
+  function getDutchMode(){
+    const sec = el("dutch2") || document;
+    const selects = Array.from(sec.querySelectorAll("select"));
+    for(const s of selects){
+      const t = s.value || (s.options[s.selectedIndex] && s.options[s.selectedIndex].text) || "";
+      if(t.includes("Dutching") || t.includes("分配") || t.includes("保守") || t.includes("等回报") || t.includes("权重")){
+        return t;
+      }
+    }
+    return "等回报 Dutching";
+  }
+
+  function getDutchTable(){
+    return el("dutchTable") || document.querySelector("#dutch2 table") || null;
+  }
+
+  function readDutchRows(){
+    const table = getDutchTable();
+    if(!table) return [];
+    return Array.from(table.querySelectorAll("tbody tr")).map(tr=>{
+      const ins = tr.querySelectorAll("input");
+      if(ins.length < 3) return null;
+      return {
+        item: (ins[0]?.value || "").trim(),
+        odds: ins[1]?.value || "",
+        weight: ins[2]?.value || "",
+        rowText: tr.innerText || ""
+      };
+    }).filter(r => r && r.item);
+  }
+
+  function currentDutchResultText(){
+    const candidates = [
+      el("dutchResult"),
+      document.querySelector("#dutch2 .result-box"),
+      document.querySelector("#dutch2 .card .result-box:last-child"),
+      document.querySelector("#inlineDutchResult"),
+      document.querySelector("#quickDutchResult")
+    ].filter(Boolean);
+    return candidates[0] ? candidates[0].innerText : "";
+  }
+
+  function readCurrentDutchRecord(){
+    const info = selectedMatchInfo();
+    const last = window.JAX_LAST_TOTAL_DUTCH || window.JAX_LAST_DUTCH_CALC || null;
+    return {
+      module: "波胆/冠军 Dutching",
+      sport: info.sport,
+      match: info.match,
+      startTime: info.startTime,
+      savedAt: info.savedAt,
+      note: val("dutchHistoryNote"),
+      budget: getDutchBudget(),
+      mode: getDutchMode(),
+      rows: readDutchRows(),
+      lastCalculation: last,
+      resultText: currentDutchResultText()
+    };
+  }
+
+  window.jaxSaveDutchHistory = function(){
+    const arr = JSON.parse(localStorage.getItem(LS_DUTCH_HISTORY) || "[]");
+    arr.unshift(readCurrentDutchRecord());
+    localStorage.setItem(LS_DUTCH_HISTORY, JSON.stringify(arr.slice(0,100)));
+    window.jaxRenderDutchHistory();
+  };
+
+  window.jaxRenderDutchHistory = function(){
+    const box = el("dutchHistoryList");
+    if(!box) return;
+    const arr = JSON.parse(localStorage.getItem(LS_DUTCH_HISTORY) || "[]");
+    if(!arr.length){
+      box.innerHTML = "暂无历史记录。";
+      return;
+    }
+
+    box.innerHTML = arr.map((x,i)=>{
+      const title = (x.sport||"未识别赛事") + "｜" + (x.match||"未选择比赛") + "｜" + (x.startTime||"未识别时间");
+      const sub = "保存：" + (x.savedAt||"-") + "｜模块：" + (x.module||"Dutching") + "｜预算：" + (x.budget||"-");
+      const note = x.note ? "｜备注：" + x.note : "";
+      return "<div class='historyItem'><details>" +
+        "<summary>" + title + "<br><span class='small'>" + sub + note + "</span></summary>" +
+        "<div class='historyDetail'>" + JSON.stringify(x,null,2) + "</div>" +
+        "</details></div>";
+    }).join("");
+  };
+
+  window.jaxClearDutchHistory = function(){
+    if(confirm("确定清空 Dutching 历史？")){
+      localStorage.removeItem(LS_DUTCH_HISTORY);
+      window.jaxRenderDutchHistory();
+    }
+  };
+
+  function readReviewRecord(){
+    const info = selectedMatchInfo();
+    const data = {
+      module: "赛后复盘",
+      sport: info.sport,
+      match: info.match,
+      startTime: info.startTime,
+      savedAt: info.savedAt,
+      note: val("reviewHistoryNote"),
+      fields: {},
+      pageText: (document.querySelector("#review") || {}).innerText || ""
+    };
+    ["reviewMatch","reviewScore","reviewBet","reviewResult","reviewNote","noteMatch","noteType","noteLevel","noteText"].forEach(id=>{
+      const x = el(id);
+      if(x) data.fields[id] = x.value || x.innerText || "";
+    });
+    return data;
+  }
+
+  window.jaxSaveReviewHistory = function(){
+    const arr = JSON.parse(localStorage.getItem(LS_REVIEW_HISTORY) || "[]");
+    arr.unshift(readReviewRecord());
+    localStorage.setItem(LS_REVIEW_HISTORY, JSON.stringify(arr.slice(0,100)));
+    window.jaxRenderReviewHistory();
+  };
+
+  window.jaxRenderReviewHistory = function(){
+    const box = el("reviewHistoryList");
+    if(!box) return;
+    const arr = JSON.parse(localStorage.getItem(LS_REVIEW_HISTORY) || "[]");
+    if(!arr.length){
+      box.innerHTML = "暂无复盘历史。";
+      return;
+    }
+    box.innerHTML = arr.map(x=>{
+      const title = (x.sport||"未识别赛事") + "｜" + (x.match||"未选择比赛") + "｜" + (x.startTime||"未识别时间");
+      const sub = "保存：" + (x.savedAt||"-") + "｜模块：" + (x.module||"赛后复盘") + (x.note ? "｜备注：" + x.note : "");
+      return "<div class='historyItem'><details>" +
+        "<summary>" + title + "<br><span class='small'>" + sub + "</span></summary>" +
+        "<div class='historyDetail'>" + JSON.stringify(x,null,2) + "</div>" +
+        "</details></div>";
+    }).join("");
+  };
+
+  window.jaxClearReviewHistory = function(){
+    if(confirm("确定清空赛后复盘历史？")){
+      localStorage.removeItem(LS_REVIEW_HISTORY);
+      window.jaxRenderReviewHistory();
+    }
+  };
+
+  function enhanceMinScoreCount_DISABLED(){
+    const sec = document.querySelector("#connect") || document;
+    const labels = Array.from(document.querySelectorAll("label, div, span"));
+    let select = null;
+
+    for(const node of labels){
+      const t = node.innerText || "";
+      if(t.includes("最低波胆数量")){
+        const parent = node.parentElement || node.closest("div");
+        if(parent) select = parent.querySelector("select");
+        if(!select){
+          const all = Array.from(document.querySelectorAll("select"));
+          select = all.find(s => Array.from(s.options).some(o => /个/.test(o.text)));
+        }
+        break;
+      }
+    }
+
+    if(!select || select.dataset.jaxEnhancedMinCount) return;
+    select.dataset.jaxEnhancedMinCount = "1";
+
+    const wrap = document.createElement("div");
+    wrap.className = "flex";
+    wrap.style.marginTop = "6px";
+    wrap.innerHTML = '<button class="btn" type="button" id="jaxMinMinus">-1</button><button class="btn" type="button" id="jaxMinPlus">+1</button><span class="small">可增减最低波胆数量</span>';
+    select.parentElement.appendChild(wrap);
+
+    function change(delta){
+      const opts = Array.from(select.options);
+      let idx = select.selectedIndex;
+      idx = Math.max(0, Math.min(opts.length-1, idx + delta));
+      select.selectedIndex = idx;
+      select.dispatchEvent(new Event("change"));
+    }
+    wrap.querySelector("#jaxMinMinus").onclick = ()=>change(-1);
+    wrap.querySelector("#jaxMinPlus").onclick = ()=>change(1);
+  }
+
+  function auditAndFixNavButtons(){
+    // 顶部tabs：确保所有tab按钮都可以切换对应section
+    const tabButtons = Array.from(document.querySelectorAll(".tabs button, nav button, header button"));
+    const tabMap = [
+      ["联网选比赛","connect"],
+      ["完整模型评分","score"],
+      ["手动盘口","manual"],
+      ["波胆/冠军","dutch2"],
+      ["滚球/对冲","live"],
+      ["赛后复盘","review"]
+    ];
+
+    tabButtons.forEach(btn=>{
+      const text = (btn.innerText||"").trim();
+      for(const [key, id] of tabMap){
+        if(text.includes(key)){
+          btn.type = "button";
+          const target = el(id);
+          if(target){
+            btn.onclick = function(){
+              document.querySelectorAll(".tab").forEach(s=>s.classList.add("hidden"));
+              target.classList.remove("hidden");
+              document.querySelectorAll(".tabs button").forEach(b=>b.classList.remove("active"));
+              btn.classList.add("active");
+              return false;
+            };
+          }
+        }
+      }
+    });
+  }
+
+  function auditAndFixCoreButtons(){
+    Array.from(document.querySelectorAll("button")).forEach(btn=>{
+      const t = (btn.innerText||"").trim();
+      btn.type = "button";
+
+      if(t.includes("保存当前 Dutching 记录")) btn.onclick = window.jaxSaveDutchHistory;
+      if(t.includes("查看历史记录")) btn.onclick = window.jaxRenderDutchHistory;
+      if(t.includes("清空历史记录")) btn.onclick = window.jaxClearDutchHistory;
+
+      if(t.includes("保存当前复盘记录")) btn.onclick = window.jaxSaveReviewHistory;
+      if(t.includes("查看复盘历史")) btn.onclick = window.jaxRenderReviewHistory;
+      if(t.includes("清空复盘历史")) btn.onclick = window.jaxClearReviewHistory;
+
+      // 对明显没有功能的按钮兜底提示，避免“无反应”
+      if(!btn.onclick && !btn.getAttribute("onclick")){
+        if(t && !["删除"].includes(t)){
+          btn.onclick = function(){
+            const msg = "这个按钮目前没有绑定具体功能：" + t + "。如果你需要这个功能，我可以继续接上。";
+            console.warn(msg);
+            alert(msg);
+            return false;
+          };
+        }
+      }
+    });
+  }
+
+  function ensureHistoryPanels(){
+    // 如果历史区存在就只补备注；不存在则不强行创建，避免布局重复
+    ensureHistoryNoteInputs();
+  }
+
+  window.addEventListener("DOMContentLoaded", function(){
+    ensureHistoryPanels();
+    /* V5.5 disabled wrong min count enhancer */
+    auditAndFixNavButtons();
+    auditAndFixCoreButtons();
+    window.jaxRenderDutchHistory();
+    window.jaxRenderReviewHistory();
+  });
+})();
+
+</script>
+<script>
+
+/* V5.5 nav order + score count position fix */
+(function(){
+  function el(id){ return document.getElementById(id); }
+
+  function removeWrongMinCountButtons(){
+    document.querySelectorAll("#jaxMinMinus, #jaxMinPlus").forEach(btn=>{
+      const wrap = btn.closest(".flex") || btn.parentElement;
+      if(wrap) wrap.remove();
+      else btn.remove();
+    });
+    document.querySelectorAll(".jaxCountControl").forEach(x=>x.remove());
+  }
+
+  function addCountControlToInlineDutch(){
+    const select = el("inlineDutchCount");
+    if(!select) return;
+    if(select.dataset.v55Enhanced === "1") return;
+    select.dataset.v55Enhanced = "1";
+
+    const wrap = document.createElement("div");
+    wrap.className = "flex jaxCountControl";
+    wrap.style.marginTop = "8px";
+    wrap.innerHTML = `
+      <button class="btn" type="button" id="jaxInlineCountMinus">-1</button>
+      <button class="btn" type="button" id="jaxInlineCountPlus">+1</button>
+      <span class="small">只控制本场波胆 Dutching 快捷区的最低波胆数量</span>
+    `;
+    select.parentElement.appendChild(wrap);
+
+    function change(delta){
+      const idx = Math.max(0, Math.min(select.options.length - 1, select.selectedIndex + delta));
+      select.selectedIndex = idx;
+      select.dispatchEvent(new Event("change", {bubbles:true}));
+    }
+
+    wrap.querySelector("#jaxInlineCountMinus").onclick = function(){ change(-1); return false; };
+    wrap.querySelector("#jaxInlineCountPlus").onclick = function(){ change(1); return false; };
+  }
+
+  function fixTopNavButtons(){
+    const desired = [
+      {text:"联网选比赛", id:"online"},
+      {text:"波胆/冠军 Dutching", id:"dutch"},
+      {text:"滚球/对冲", id:"live"},
+      {text:"手动盘口", id:"manualOdds"},
+      {text:"赛后复盘", id:"review"},
+      {text:"完整模型评分", id:"engine"}
+    ];
+
+    const tabs = document.querySelector(".tabs");
+    if(tabs){
+      tabs.innerHTML = "";
+      desired.forEach((item, i)=>{
+        const btn = document.createElement("button");
+        btn.textContent = item.text;
+        btn.type = "button";
+        if(i === 0) btn.classList.add("active");
+        btn.onclick = function(){
+          if(typeof showTab === "function"){
+            showTab(item.id, btn);
+          }else{
+            document.querySelectorAll(".tab").forEach(s=>s.classList.add("hidden"));
+            const target = el(item.id);
+            if(target) target.classList.remove("hidden");
+            document.querySelectorAll(".tabs button").forEach(b=>b.classList.remove("active"));
+            btn.classList.add("active");
+          }
+          return false;
+        };
+        tabs.appendChild(btn);
+      });
+    }
+  }
+
+  function fixButtonAuditMap(){
+    // 兜底修复：如果前面版本把按钮映射到不存在的 connect/score/dutch2，这里重新接到真实id。
+    const map = {
+      "联网选比赛":"online",
+      "波胆/冠军":"dutch",
+      "滚球/对冲":"live",
+      "手动盘口":"manualOdds",
+      "赛后复盘":"review",
+      "完整模型评分":"engine"
+    };
+    document.querySelectorAll("button").forEach(btn=>{
+      const t = (btn.innerText || "").trim();
+      Object.keys(map).forEach(k=>{
+        if(t.includes(k)){
+          btn.type = "button";
+          btn.onclick = function(){
+            if(typeof showTab === "function"){
+              showTab(map[k], btn);
+            }else{
+              document.querySelectorAll(".tab").forEach(s=>s.classList.add("hidden"));
+              const target = el(map[k]);
+              if(target) target.classList.remove("hidden");
+              document.querySelectorAll(".tabs button").forEach(b=>b.classList.remove("active"));
+              btn.classList.add("active");
+            }
+            return false;
+          };
+        }
+      });
+    });
+  }
+
+  window.addEventListener("DOMContentLoaded", function(){
+    fixTopNavButtons();
+    fixButtonAuditMap();
+    removeWrongMinCountButtons();
+    addCountControlToInlineDutch();
   });
 })();
 
