@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>足球投注模型 V3.4 朋友免Key联网版</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+:root{
+  --bg:#f4f6f8;--card:#fff;--text:#111827;--muted:#6b7280;--line:#e5e7eb;
+  --dark:#111827;--blue:#2563eb;--green:#16a34a;--red:#dc2626;--amber:#d97706;--purple:#7c3aed;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",Arial,sans-serif}
+header{background:var(--dark);color:#fff;padding:18px 20px}
+header h1{margin:0;font-size:22px}
+header p{margin:6px 0 0;color:#d1d5db;font-size:14px}
+main{max-width:1280px;margin:20px auto;padding:0 16px 48px}
+.card{background:var(--card);border-radius:14px;padding:18px;box-shadow:0 2px 12px rgba(0,0,0,.06);margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media(max-width:760px){.grid2,.grid3,.grid4{grid-template-columns:1fr}}
+h2{font-size:18px;margin:0 0 12px}
+h3{font-size:15px;margin:16px 0 8px}
+label{display:block;font-size:13px;color:#374151;margin-top:10px}
+input,select,textarea{width:100%;border:1px solid #d1d5db;border-radius:8px;padding:9px 10px;font-size:14px;margin-top:4px;background:#fff}
+textarea{min-height:72px;resize:vertical}
+button{border:0;border-radius:9px;padding:10px 14px;background:var(--blue);color:#fff;font-weight:800;cursor:pointer;margin-top:12px}
+button.secondary{background:#374151} button.green{background:var(--green)} button.danger{background:var(--red)} button.purple{background:var(--purple)}
+button.small{padding:6px 9px;font-size:12px;margin-top:0}
+table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px}
+th,td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:middle}
+th{background:#f9fafb;color:#374151}
+.result-box{background:#f9fafb;border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:12px;font-size:14px;line-height:1.65;overflow:auto}
+.notice{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:10px;padding:12px;font-size:14px;line-height:1.6;margin-bottom:16px}
+.muted{color:var(--muted);font-size:13px}.smalltext{font-size:12px;color:var(--muted);line-height:1.5}.ok{color:#166534;font-weight:800}.bad{color:#991b1b;font-weight:800}.warn{color:#92400e;font-weight:800}
+.badge{display:inline-block;padding:3px 8px;border-radius:999px;font-size:12px;font-weight:800;white-space:nowrap}
+.p1{background:#dcfce7;color:#166534}.p2{background:#dbeafe;color:#1d4ed8}.p3{background:#fef3c7;color:#92400e}.avoid{background:#fee2e2;color:#991b1b}
+.tag{display:inline-block;background:#eef2ff;color:#3730a3;border-radius:999px;padding:2px 8px;font-size:12px;margin:2px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.tab{background:#fff;border:1px solid var(--line);color:#111827;padding:9px 12px;border-radius:999px}.tab.active{background:#111827;color:#fff}
+.section{display:none}.section.active{display:block}.flex{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.nowrap{white-space:nowrap}
+.matchItem{padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff;margin:8px 0;cursor:pointer}
+.matchItem:hover{border-color:#2563eb}.matchItem.active{border-color:#2563eb;background:#eff6ff}
+hr{border:0;border-top:1px solid var(--line);margin:16px 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>足球投注模型 V3.4 朋友免Key联网版</h1>
+  <p>朋友免填Key + 服务器代理联网赔率 + 自动模型分析 + 比分预测 + 大小球/让球/胜平负/波胆推荐</p>
+</header>
+<main>
+  <div class="notice">
+    使用说明：这个版本适合部署成公开网站给朋友使用。API Key 不放在网页里，而是放在服务器环境变量里。朋友打开网址即可选择比赛并分析，不需要自己填Key。金额栏默认留空，由你自己决定下注额度。
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('tab-online',this)">联网选比赛</button>
+    <button class="tab" onclick="showTab('tab-manual',this)">手动分析</button>
+    <button class="tab" onclick="showTab('tab-dutch',this)">波胆Dutching</button>
+    <button class="tab" onclick="showTab('tab-live',this)">滚球/对冲</button>
+    <button class="tab" onclick="showTab('tab-review',this)">赛后复盘</button>
+  </div>
+
+  <section id="tab-online" class="section active">
+    <div class="grid">
+      <div class="card">
+        <h2>一、联网设置</h2>
+        <p class="smalltext">
+          朋友免Key版：API Key 存在服务器环境变量 <b>THE_ODDS_API_KEY</b> 里，不会显示在网页上。
+          部署后直接点击“获取足球赛事列表”即可。
+        </p>
+        <div class="flex">
+          <button class="secondary" onclick="loadSoccerSports()">获取足球赛事列表</button>
+        </div>
+        <p class="smalltext">如果联网接口失败，仍可用“手动分析模式”输入盘口图里的赔率。</p>
+
+        <label>足球赛事</label>
+        <select id="sportSelect"></select>
+        <div class="grid2">
+          <div>
+            <label>地区</label>
+            <select id="regionSelect">
+              <option value="eu" selected>欧洲盘</option>
+              <option value="us">美国盘</option>
+              <option value="uk">英国盘</option>
+              <option value="au">澳洲盘</option>
+            </select>
+          </div>
+          <div>
+            <label>赔率格式</label>
+            <select id="oddsFormat"><option value="decimal" selected>Decimal 小数</option></select>
+          </div>
+        </div>
+        <button onclick="fetchOdds()">获取近期比赛</button>
+        <div id="onlineStatus" class="result-box">等待操作。</div>
+      </div>
+
+      <div class="card">
+        <h2>二、近期比赛</h2>
+        <div id="matchList" class="result-box">暂无比赛。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>三、选中比赛后自动分析</h2>
+      <div class="grid4">
+        <div>
+          <label>天气城市，可选</label>
+          <input id="weatherCity" placeholder="如 Miami / Los Angeles / Mexico City">
+        </div>
+        <div>
+          <label>天气影响</label>
+          <select id="onlineWeatherImpact"><option>自动/未知</option><option>低</option><option selected>中</option><option>高</option></select>
+        </div>
+        <div>
+          <label>教练目的</label>
+          <select id="onlineCoach"><option>必须赢</option><option selected>小胜即可</option><option>控分/挑路线</option><option>练阵/轮换</option><option>保平即可</option></select>
+        </div>
+        <div>
+          <label>红牌/犯规风险</label>
+          <select id="onlineCard"><option>低</option><option selected>中</option><option>高</option></select>
+        </div>
+      </div>
+      <div class="flex">
+        <button onclick="fetchWeatherAndAnalyze()">联网天气+分析</button>
+        <button class="secondary" onclick="analyzeSelected(false)">只按赔率分析</button>
+        <button class="green" onclick="saveCurrentAnalysis()">保存推荐到复盘</button>
+      </div>
+      <div id="analysisResult" class="result-box">请选择一场比赛。</div>
+    </div>
+  </section>
+
+  <section id="tab-manual" class="section">
+    <div class="card">
+      <h2>四、手动分析模式</h2>
+      <p class="muted">没有联网数据时，把盘口图里的赔率手动填进来即可。模型会一样给出胜平负、大小球、让球、比分预测和优先级。</p>
+      <div class="grid2">
+        <div><label>主队</label><input id="mHome" value="主队"></div>
+        <div><label>客队</label><input id="mAway" value="客队"></div>
+      </div>
+      <h3>胜平负赔率</h3>
+      <div class="grid3">
+        <div><label>主胜</label><input id="mHomeOdds" type="number" step="0.01" value="1.80"></div>
+        <div><label>平局</label><input id="mDrawOdds" type="number" step="0.01" value="3.50"></div>
+        <div><label>客胜</label><input id="mAwayOdds" type="number" step="0.01" value="4.50"></div>
+      </div>
+      <h3>大小球</h3>
+      <div class="grid3">
+        <div><label>盘口</label><input id="mTotalLine" type="number" step="0.25" value="2.75"></div>
+        <div><label>大球赔率</label><input id="mOverOdds" type="number" step="0.01" value="1.90"></div>
+        <div><label>小球赔率</label><input id="mUnderOdds" type="number" step="0.01" value="1.90"></div>
+      </div>
+      <h3>让球，主队视角</h3>
+      <div class="grid3">
+        <div><label>主队让球</label><input id="mSpreadLine" type="number" step="0.25" value="-1"></div>
+        <div><label>主队让球赔率</label><input id="mSpreadHomeOdds" type="number" step="0.01" value="1.90"></div>
+        <div><label>客队受让赔率</label><input id="mSpreadAwayOdds" type="number" step="0.01" value="1.90"></div>
+      </div>
+      <div class="grid4">
+        <div><label>天气影响</label><select id="mWeather"><option>低</option><option selected>中</option><option>高</option></select></div>
+        <div><label>教练目的</label><select id="mCoach"><option>必须赢</option><option selected>小胜即可</option><option>控分/挑路线</option><option>练阵/轮换</option><option>保平即可</option></select></div>
+        <div><label>红牌/犯规风险</label><select id="mCard"><option>低</option><option selected>中</option><option>高</option></select></div>
+        <div><label>比赛性质</label><select id="mNature"><option>世界杯</option><option selected>友谊赛</option><option>联赛</option><option>杯赛</option></select></div>
+      </div>
+      <button onclick="manualAnalyze()">开始分析</button>
+      <button class="green" onclick="saveManualAnalysis()">保存推荐到复盘</button>
+      <div id="manualResult" class="result-box"></div>
+    </div>
+  </section>
+
+  <section id="tab-dutch" class="section">
+    <div class="grid">
+      <div class="card">
+        <h2>五、波胆 Dutching 分配</h2>
+        <label>比赛名称</label><input id="dutchMatch" value="A队 vs B队">
+        <label>波胆总预算，可填可不填</label><input id="dutchBudget" type="number" value="300">
+        <table id="dutchTable">
+          <thead><tr><th>比分</th><th>赔率</th><th>权重</th><th>类型</th><th></th></tr></thead>
+          <tbody>
+            <tr><td><input value="2-0"></td><td><input type="number" step="0.01" value="7.0"></td><td><input type="number" step="0.1" value="40"></td><td><select><option>主剧本</option><option>防守剧本</option><option>防反剧本</option><option>爆点剧本</option><option>意外剧本</option></select></td><td><button class="small danger" onclick="removeRow(this)">删</button></td></tr>
+            <tr><td><input value="2-1"></td><td><input type="number" step="0.01" value="8.5"></td><td><input type="number" step="0.1" value="25"></td><td><select><option>主剧本</option><option selected>防反剧本</option><option>防守剧本</option><option>爆点剧本</option><option>意外剧本</option></select></td><td><button class="small danger" onclick="removeRow(this)">删</button></td></tr>
+            <tr><td><input value="1-0"></td><td><input type="number" step="0.01" value="6.5"></td><td><input type="number" step="0.1" value="20"></td><td><select><option>主剧本</option><option selected>防守剧本</option><option>防反剧本</option><option>爆点剧本</option><option>意外剧本</option></select></td><td><button class="small danger" onclick="removeRow(this)">删</button></td></tr>
+            <tr><td><input value="3-1"></td><td><input type="number" step="0.01" value="13.0"></td><td><input type="number" step="0.1" value="15"></td><td><select><option>主剧本</option><option>防守剧本</option><option>防反剧本</option><option selected>爆点剧本</option><option>意外剧本</option></select></td><td><button class="small danger" onclick="removeRow(this)">删</button></td></tr>
+          </tbody>
+        </table>
+        <button class="secondary" onclick="addDutchRow()">增加比分</button>
+        <button onclick="calcDutching()">计算Dutching</button>
+      </div>
+      <div class="card"><h2>六、Dutching结果</h2><div id="dutchResult" class="result-box"></div></div>
+    </div>
+  </section>
+
+  <section id="tab-live" class="section">
+    <div class="grid">
+      <div class="card">
+        <h2>七、比赛中触发器</h2>
+        <div class="grid2">
+          <label><input type="checkbox" class="trigger" value="no_shot"> 15分钟强队无射正</label>
+          <label><input type="checkbox" class="trigger" value="high_xg"> 15分钟高质量机会多</label>
+          <label><input type="checkbox" class="trigger" value="weak_yellow"> 弱队早早吃黄牌</label>
+          <label><input type="checkbox" class="trigger" value="red_card"> 红牌出现</label>
+          <label><input type="checkbox" class="trigger" value="favorite_slow"> 强队只倒脚不进禁区</label>
+          <label><input type="checkbox" class="trigger" value="favorite_continue"> 领先方继续压</label>
+          <label><input type="checkbox" class="trigger" value="favorite_stop"> 领先方明显回收</label>
+          <label><input type="checkbox" class="trigger" value="attacking_sub"> 60分钟换进攻球员</label>
+          <label><input type="checkbox" class="trigger" value="defensive_sub"> 60分钟换防守球员</label>
+          <label><input type="checkbox" class="trigger" value="weather_drop"> 高温节奏下降</label>
+        </div>
+        <button onclick="analyzeTriggers()">生成临场建议</button>
+        <div id="triggerResult" class="result-box"></div>
+      </div>
+      <div class="card">
+        <h2>八、滚球对冲计算器</h2>
+        <div class="grid2">
+          <div><label>原下注金额</label><input id="origStake" type="number" value="300"></div>
+          <div><label>原赔率</label><input id="origOdds" type="number" step="0.01" value="2.00"></div>
+          <div><label>对冲方向当前赔率</label><input id="hedgeOdds" type="number" step="0.01" value="2.20"></div>
+          <div><label>对冲模式</label><select id="hedgeMode"><option value="equal">两边收益尽量均衡</option><option value="half">只对冲一半风险</option><option value="losscap">控制最大亏损</option></select></div>
+          <div><label>最大可接受亏损</label><input id="maxLoss" type="number" value="100"></div>
+          <div><label>当前备注</label><input id="liveNote" value="60分钟 1-0"></div>
+        </div>
+        <button onclick="calcHedge()">计算对冲金额</button>
+        <div id="hedgeResult" class="result-box"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-review" class="section">
+    <div class="card">
+      <h2>九、赛后复盘</h2>
+      <div class="flex">
+        <button class="secondary" onclick="renderReview()">刷新</button>
+        <button class="purple" onclick="exportData()">导出数据</button>
+        <button class="secondary" onclick="document.getElementById('importFile').click()">导入数据</button>
+        <input id="importFile" type="file" accept=".json" style="display:none" onchange="importData(event)">
+        <button class="danger" onclick="clearReview()">清空复盘</button>
+      </div>
+      <div id="reviewList" class="result-box"></div>
+      <div id="statsResult" class="result-box"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const LS_REVIEW="football_v34_review";
+let eventsCache=[];
+let selectedEvent=null;
+let currentRecommendations=[];
+let lastManualRecommendations=[];
+
+const fallbackSports=[
+  ["soccer_fifa_world_cup","FIFA World Cup"],
+  ["soccer_uefa_champs_league","UEFA Champions League"],
+  ["soccer_uefa_europa_league","UEFA Europa League"],
+  ["soccer_epl","English Premier League"],
+  ["soccer_spain_la_liga","La Liga"],
+  ["soccer_italy_serie_a","Serie A"],
+  ["soccer_germany_bundesliga","Bundesliga"],
+  ["soccer_france_ligue_one","Ligue 1"],
+  ["soccer_usa_mls","MLS"],
+  ["soccer_mexico_ligamx","Mexico Liga MX"],
+  ["soccer_japan_j_league","Japan J League"],
+  ["soccer_china_superleague","China Super League"],
+  ["soccer_sweden_allsvenskan","Sweden Allsvenskan"],
+  ["soccer_norway_eliteserien","Norway Eliteserien"],
+  ["soccer_brazil_campeonato","Brazil Serie A"],
+  ["soccer_argentina_primera_division","Argentina Primera División"]
+];
+
+function showTab(id,btn){
+  document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+  btn.classList.add("active");
+  if(id==="tab-review"){renderReview();renderStats();}
+}
+function fmt(n){if(!isFinite(n))return "-";return Math.round(n*100)/100}
+function pct(n){return fmt(n*100)+"%"}
+function avg(arr){arr=arr.filter(x=>isFinite(x)&&x>1);return arr.length?arr.reduce((s,x)=>s+x,0)/arr.length:null}
+function badge(p){if(p==="P1")return'<span class="badge p1">P1 优先</span>';if(p==="P2")return'<span class="badge p2">P2 可买</span>';if(p==="P3")return'<span class="badge p3">P3 小注</span>';return'<span class="badge avoid">不碰</span>'}
+function pr(ev){if(ev>0.08)return"P1";if(ev>0.04)return"P2";if(ev>0.01)return"P3";return"不碰"}
+function ev(prob, odds){return prob*odds-1}
+function normalize3(o1,od,o2){
+  const a=1/o1,b=1/od,c=1/o2,total=a+b+c;
+  return {home:a/total,draw:b/total,away:c/total,overround:total};
+}
+function normalize2(o1,o2){
+  const a=1/o1,b=1/o2,total=a+b;
+  return {a:a/total,b:b/total,overround:total};
+}
+
+function init(){
+  fillSportSelect(fallbackSports);
+  calcDutching();
+  renderReview();
+}
+function fillSportSelect(list){
+  const sel=document.getElementById("sportSelect");
+  sel.innerHTML=list.map(([key,title])=>`<option value="${key}">${title} (${key})</option>`).join("");
+}
+
+async function loadSoccerSports(){
+  try{
+    document.getElementById("onlineStatus").innerHTML="正在通过服务器获取足球赛事列表...";
+    const res=await fetch("/api/sports");
+    if(!res.ok){
+      const txt=await res.text();
+      throw new Error("HTTP "+res.status+"｜"+txt);
+    }
+    const data=await res.json();
+    const soccer=data.filter(x=>x.group==="Soccer"||x.key.startsWith("soccer_")).map(x=>[x.key,x.title]);
+    fillSportSelect(soccer.length?soccer:fallbackSports);
+    document.getElementById("onlineStatus").innerHTML=`已获取 ${soccer.length} 个足球赛事。`;
+  }catch(e){
+    document.getElementById("onlineStatus").innerHTML=`获取失败：${e.message}<br>请检查服务器环境变量 THE_ODDS_API_KEY 是否已设置。你仍可用手动分析模式。`;
+  }
+}
+async function fetchOdds(){
+  const sport=document.getElementById("sportSelect").value;
+  const region=document.getElementById("regionSelect").value;
+  try{
+    document.getElementById("onlineStatus").innerHTML="正在通过服务器获取赔率...";
+    const url=`/api/odds?sport=${encodeURIComponent(sport)}&region=${encodeURIComponent(region)}`;
+    const res=await fetch(url);
+    if(!res.ok){
+      const txt=await res.text();
+      throw new Error("HTTP "+res.status+"｜"+txt);
+    }
+    const data=await res.json();
+    eventsCache=data||[];
+    renderMatchList();
+    document.getElementById("onlineStatus").innerHTML=`已获取 ${eventsCache.length} 场近期比赛。`;
+  }catch(e){
+    document.getElementById("onlineStatus").innerHTML=`获取失败：${e.message}<br>请检查服务器环境变量 THE_ODDS_API_KEY、API额度或赛事是否有赔率。也可以用手动分析模式。`;
+  }
+}
+function renderMatchList(){
+  const box=document.getElementById("matchList");
+  if(!eventsCache.length){box.innerHTML="暂无比赛。";return;}
+  box.innerHTML=eventsCache.map((ev,i)=>{
+    const t=new Date(ev.commence_time).toLocaleString();
+    return `<div class="matchItem" onclick="selectEvent(${i},this)">
+      <b>${ev.home_team}</b> vs <b>${ev.away_team}</b><br>
+      <span class="muted">${t}｜博彩公司：${(ev.bookmakers||[]).length}</span>
+    </div>`;
+  }).join("");
+}
+function selectEvent(i,el){
+  selectedEvent=eventsCache[i];
+  document.querySelectorAll(".matchItem").forEach(x=>x.classList.remove("active"));
+  el.classList.add("active");
+  document.getElementById("weatherCity").value="";
+  analyzeSelected(false);
+}
+
+function extractAvgMarkets(event){
+  let h=[],d=[],a=[], over=[],under=[], totalLines=[], sh=[],sa=[], spreadLines=[];
+  (event.bookmakers||[]).forEach(b=>{
+    (b.markets||[]).forEach(m=>{
+      if(m.key==="h2h"){
+        const oh=m.outcomes||[];
+        const home=oh.find(o=>o.name===event.home_team);
+        const away=oh.find(o=>o.name===event.away_team);
+        const draw=oh.find(o=>/draw/i.test(o.name));
+        if(home)h.push(home.price); if(draw)d.push(draw.price); if(away)a.push(away.price);
+      }
+      if(m.key==="totals"){
+        (m.outcomes||[]).forEach(o=>{
+          if(o.point!=null) totalLines.push(o.point);
+          if(/over/i.test(o.name)) over.push(o.price);
+          if(/under/i.test(o.name)) under.push(o.price);
+        });
+      }
+      if(m.key==="spreads"){
+        (m.outcomes||[]).forEach(o=>{
+          if(o.name===event.home_team){ sh.push(o.price); if(o.point!=null)spreadLines.push(o.point); }
+          if(o.name===event.away_team){ sa.push(o.price); }
+        });
+      }
+    });
+  });
+  return {
+    homeOdds:avg(h), drawOdds:avg(d), awayOdds:avg(a),
+    overOdds:avg(over), underOdds:avg(under),
+    totalLine: totalLines.length ? median(totalLines) : null,
+    spreadHomeOdds:avg(sh), spreadAwayOdds:avg(sa),
+    spreadLine: spreadLines.length ? median(spreadLines) : null
+  };
+}
+function median(arr){arr=arr.filter(x=>isFinite(x)).sort((a,b)=>a-b);if(!arr.length)return null;const m=Math.floor(arr.length/2);return arr.length%2?arr[m]:(arr[m-1]+arr[m])/2;}
+
+async function fetchWeatherAndAnalyze(){
+  const city=document.getElementById("weatherCity").value.trim();
+  if(!city){analyzeSelected(false);return;}
+  try{
+    document.getElementById("analysisResult").innerHTML="正在获取天气...";
+    const geo=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=zh&format=json`).then(r=>r.json());
+    if(!geo.results||!geo.results.length)throw new Error("找不到城市");
+    const g=geo.results[0];
+    const w=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${g.latitude}&longitude=${g.longitude}&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation_probability&forecast_days=16&timezone=auto`).then(r=>r.json());
+    analyzeSelected(true,{geo:g,weather:w});
+  }catch(e){
+    document.getElementById("analysisResult").innerHTML=`天气获取失败：${e.message}<br>已按赔率分析。`;
+    analyzeSelected(false);
+  }
+}
+
+function pickWeatherForTime(w, isoTime){
+  if(!w||!w.hourly)return null;
+  const times=w.hourly.time||[];
+  if(!times.length)return null;
+  const target=new Date(isoTime).getTime();
+  let best=0,dist=Infinity;
+  times.forEach((t,i)=>{const d=Math.abs(new Date(t).getTime()-target);if(d<dist){dist=d;best=i;}});
+  return {
+    temp:w.hourly.temperature_2m?.[best],
+    humidity:w.hourly.relative_humidity_2m?.[best],
+    wind:w.hourly.wind_speed_10m?.[best],
+    rain:w.hourly.precipitation_probability?.[best],
+    time:times[best]
+  };
+}
+
+function analyzeSelected(withWeather, weatherObj){
+  if(!selectedEvent){document.getElementById("analysisResult").innerHTML="请选择比赛。";return;}
+  const mk=extractAvgMarkets(selectedEvent);
+  const factors={
+    weatherImpact:document.getElementById("onlineWeatherImpact").value,
+    coach:document.getElementById("onlineCoach").value,
+    card:document.getElementById("onlineCard").value,
+    nature:"联网赛事"
+  };
+  let weather=null;
+  if(withWeather&&weatherObj){
+    weather=pickWeatherForTime(weatherObj.weather, selectedEvent.commence_time);
+    factors.weatherImpact=autoWeatherImpact(weather);
+  }
+  const result=runModel(selectedEvent.home_team, selectedEvent.away_team, mk, factors);
+  currentRecommendations=result.recommendations;
+  renderAnalysis("analysisResult", selectedEvent.home_team, selectedEvent.away_team, selectedEvent.commence_time, mk, factors, result, weather, weatherObj?.geo);
+}
+function autoWeatherImpact(w){
+  if(!w)return document.getElementById("onlineWeatherImpact").value;
+  const t=w.temp??22,h=w.humidity??50,wind=w.wind??5;
+  if(t>=30 || (t>=27&&h>=70) || wind>=28) return "高";
+  if(t>=25 || h>=65 || wind>=18) return "中";
+  return "低";
+}
+
+function manualAnalyze(){
+  const home=document.getElementById("mHome").value.trim()||"主队";
+  const away=document.getElementById("mAway").value.trim()||"客队";
+  const mk={
+    homeOdds:parseFloat(document.getElementById("mHomeOdds").value||0),
+    drawOdds:parseFloat(document.getElementById("mDrawOdds").value||0),
+    awayOdds:parseFloat(document.getElementById("mAwayOdds").value||0),
+    totalLine:parseFloat(document.getElementById("mTotalLine").value||0),
+    overOdds:parseFloat(document.getElementById("mOverOdds").value||0),
+    underOdds:parseFloat(document.getElementById("mUnderOdds").value||0),
+    spreadLine:parseFloat(document.getElementById("mSpreadLine").value||0),
+    spreadHomeOdds:parseFloat(document.getElementById("mSpreadHomeOdds").value||0),
+    spreadAwayOdds:parseFloat(document.getElementById("mSpreadAwayOdds").value||0)
+  };
+  const factors={
+    weatherImpact:document.getElementById("mWeather").value,
+    coach:document.getElementById("mCoach").value,
+    card:document.getElementById("mCard").value,
+    nature:document.getElementById("mNature").value
+  };
+  const result=runModel(home, away, mk, factors);
+  lastManualRecommendations=result.recommendations;
+  renderAnalysis("manualResult", home, away, null, mk, factors, result, null, null);
+}
+
+function factorial(n){let r=1;for(let i=2;i<=n;i++)r*=i;return r}
+function pois(k,lambda){return Math.exp(-lambda)*Math.pow(lambda,k)/factorial(k)}
+function totalProb(mu,k){return pois(k,mu)}
+function cdf(mu,k){let s=0;for(let i=0;i<=k;i++)s+=totalProb(mu,i);return s}
+function effectiveOverProb(mu,line){
+  if(!line||!isFinite(line)) return null;
+  const n=Math.floor(line+1e-9), frac=+(line-n).toFixed(2);
+  if(Math.abs(frac-0.5)<0.01) return 1-cdf(mu,n);
+  if(Math.abs(frac-0.0)<0.01) return (1-cdf(mu,n)) + 0.5*totalProb(mu,n);
+  if(Math.abs(frac-0.25)<0.01) return 1-cdf(mu,n);
+  if(Math.abs(frac-0.75)<0.01) return (1-cdf(mu,n+1)) + 0.5*totalProb(mu,n+1);
+  return 1-cdf(mu,Math.floor(line));
+}
+function solveMuForOverProb(line,pOver){
+  if(!line||!pOver)return 2.55;
+  let lo=0.4,hi=5.5;
+  for(let i=0;i<50;i++){
+    const mid=(lo+hi)/2;
+    const p=effectiveOverProb(mid,line);
+    if(p<pOver)lo=mid;else hi=mid;
+  }
+  return (lo+hi)/2;
+}
+function buildScoreMatrix(lh,la){
+  const arr=[];
+  let sum=0;
+  for(let h=0;h<=6;h++){
+    for(let a=0;a<=6;a++){
+      const p=pois(h,lh)*pois(a,la);
+      arr.push({h,a,p});
+      sum+=p;
+    }
+  }
+  arr.forEach(x=>x.p=x.p/sum);
+  return arr;
+}
+function scoreProbs(matrix){
+  const pHome=matrix.filter(x=>x.h>x.a).reduce((s,x)=>s+x.p,0);
+  const pDraw=matrix.filter(x=>x.h===x.a).reduce((s,x)=>s+x.p,0);
+  const pAway=matrix.filter(x=>x.h<x.a).reduce((s,x)=>s+x.p,0);
+  return {pHome,pDraw,pAway};
+}
+function overFromMatrix(matrix,line){
+  return matrix.reduce((s,x)=>{
+    const t=x.h+x.a;
+    const n=Math.floor(line+1e-9), frac=+(line-n).toFixed(2);
+    if(Math.abs(frac-0.5)<0.01) return s + (t>=n+1?x.p:0);
+    if(Math.abs(frac-0.0)<0.01) return s + (t>=n+1?x.p:(t===n?0.5*x.p:0));
+    if(Math.abs(frac-0.25)<0.01) return s + (t>=n+1?x.p:0);
+    if(Math.abs(frac-0.75)<0.01) return s + (t>=n+2?x.p:(t===n+1?0.5*x.p:0));
+    return s + (t>line?x.p:0);
+  },0);
+}
+function spreadCoverFromMatrix(matrix,line){
+  // line是主队让球/受让，主队净胜 + line > 0 为主队方向赢
+  let pH=0,pPush=0,pA=0;
+  matrix.forEach(x=>{
+    const v=(x.h-x.a)+line;
+    if(v>0.0001)pH+=x.p; else if(Math.abs(v)<=0.0001)pPush+=x.p; else pA+=x.p;
+  });
+  // 推盘当半赢半输处理，用有效概率
+  return {home:pH+0.5*pPush, away:pA+0.5*pPush, push:pPush};
+}
+
+function adjustFactors(baseMu, diff, factors){
+  let mu=baseMu, d=diff;
+  if(factors.weatherImpact==="高"){mu-=0.18; d*=0.94;}
+  if(factors.weatherImpact==="低"){mu+=0.03;}
+  if(factors.coach==="控分/挑路线"){mu-=0.18; d*=0.9;}
+  if(factors.coach==="小胜即可"){mu-=0.10; d*=0.92;}
+  if(factors.coach==="必须赢"){mu+=0.08; d*=1.04;}
+  if(factors.coach==="练阵/轮换"){mu+=0.05; d*=0.92;}
+  if(factors.coach==="保平即可"){mu-=0.16; d*=0.82;}
+  if(factors.card==="高"){mu+=0.16; d*=1.05;}
+  if(factors.card==="低"){mu-=0.04;}
+  mu=Math.max(1.4,Math.min(4.2,mu));
+  d=Math.max(-2.2,Math.min(2.2,d));
+  return {mu,d};
+}
+
+function runModel(home,away,mk,factors){
+  let h2h=null, pH=0.45,pD=0.27,pA=0.28;
+  if(mk.homeOdds&&mk.drawOdds&&mk.awayOdds){
+    h2h=normalize3(mk.homeOdds,mk.drawOdds,mk.awayOdds);
+    pH=h2h.home;pD=h2h.draw;pA=h2h.away;
+  }
+  let pOverMarket=null, baseMu=2.55;
+  if(mk.overOdds&&mk.underOdds&&mk.totalLine){
+    const ou=normalize2(mk.overOdds,mk.underOdds);
+    pOverMarket=ou.a;
+    baseMu=solveMuForOverProb(mk.totalLine,pOverMarket);
+  }
+  let diff=Math.log(Math.max(pH,0.03)/Math.max(pA,0.03))*0.55;
+  const adj=adjustFactors(baseMu,diff,factors);
+  let lh=(adj.mu+adj.d)/2, la=(adj.mu-adj.d)/2;
+  if(lh<0.15){la+=0.15-lh;lh=0.15}
+  if(la<0.15){lh+=0.15-la;la=0.15}
+  const matrix=buildScoreMatrix(lh,la);
+  const sp=scoreProbs(matrix);
+  const topScores=[...matrix].sort((a,b)=>b.p-a.p).slice(0,8);
+  const recs=[];
+
+  if(mk.homeOdds)recs.push(makeRec("胜平负",home+"胜",mk.homeOdds,sp.pHome,"强弱方向",`${home}胜概率 ${pct(sp.pHome)}`));
+  if(mk.drawOdds)recs.push(makeRec("胜平负","平局",mk.drawOdds,sp.pDraw,"防冷方向",`平局概率 ${pct(sp.pDraw)}`));
+  if(mk.awayOdds)recs.push(makeRec("胜平负",away+"胜",mk.awayOdds,sp.pAway,"反向冷门",`${away}胜概率 ${pct(sp.pAway)}`));
+
+  if(mk.totalLine&&mk.overOdds&&mk.underOdds){
+    const pO=overFromMatrix(matrix,mk.totalLine);
+    recs.push(makeRec("大小球",`大${mk.totalLine}`,mk.overOdds,pO,"总进球",`模型总进球均值 ${fmt(lh+la)}`));
+    recs.push(makeRec("大小球",`小${mk.totalLine}`,mk.underOdds,1-pO,"总进球",`模型总进球均值 ${fmt(lh+la)}`));
+  }
+  if(mk.spreadLine!=null&&mk.spreadHomeOdds&&mk.spreadAwayOdds){
+    const sc=spreadCoverFromMatrix(matrix,mk.spreadLine);
+    recs.push(makeRec("让球",`${home} ${mk.spreadLine}`,mk.spreadHomeOdds,sc.home,"让球方向",`主队有效穿盘 ${pct(sc.home)}`));
+    recs.push(makeRec("让球",`${away} ${-mk.spreadLine}`,mk.spreadAwayOdds,sc.away,"受让方向",`客队有效受让 ${pct(sc.away)}`));
+  }
+
+  topScores.slice(0,5).forEach((s,i)=>{
+    recs.push({
+      market:"波胆", side:`${s.h}-${s.a}`, odds:"需填", probability:s.p, ev:null,
+      priority:i===0?"P2":(i<=2?"P3":"小注观察"),
+      reason:i===0?"主比分":(i<=2?"防守/防反比分":"爆点/防冷比分"),
+      amount:""
+    });
+  });
+
+  recs.sort((a,b)=>{
+    const order={"P1":1,"P2":2,"P3":3,"小注观察":4,"不碰":9};
+    return (order[a.priority]||8)-(order[b.priority]||8) || ((b.ev??-9)-(a.ev??-9));
+  });
+
+  const script=buildScript(home,away,lh,la,sp,adj,factors,topScores,mk);
+  return {lambdaHome:lh,lambdaAway:la,modelProb:sp,topScores,recommendations:recs,script,mu:lh+la};
+}
+function makeRec(market,side,odds,prob,reason,note){
+  const e=ev(prob,odds);
+  return {market,side,odds,probability:prob,ev:e,priority:pr(e),reason,note,amount:""};
+}
+function buildScript(home,away,lh,la,sp,adj,factors,topScores,mk){
+  const fav=sp.pHome>sp.pAway?home:away;
+  const pFav=Math.max(sp.pHome,sp.pAway);
+  let lines=[];
+  lines.push(`主模型倾向：${fav}不败/优势更高，胜率区间约 ${pct(pFav)}。`);
+  lines.push(`预估进球均值：${fmt(lh+la)}，${home} λ=${fmt(lh)}，${away} λ=${fmt(la)}。`);
+  if(factors.weatherImpact==="高")lines.push("天气影响高：高温/高湿/风雨会压低节奏，深盘和过热大球要降权。");
+  if(factors.coach==="控分/挑路线"||factors.coach==="小胜即可")lines.push("教练目的偏保守：领先后收比赛概率上升，防赢球输盘。");
+  if(factors.card==="高")lines.push("红牌/犯规风险高：弱队受让和小球不能重仓，必须防点球/红牌带来的爆点比分。");
+  lines.push(`核心比分池：${topScores.slice(0,5).map(s=>`${s.h}-${s.a}`).join(" / ")}。`);
+  return lines;
+}
+
+function renderAnalysis(targetId,home,away,time,mk,factors,result,weather,geo){
+  let weatherHtml="";
+  if(weather){
+    weatherHtml=`<tr><td>联网天气</td><td>${geo.name||""}｜${weather.time||""}｜温度${weather.temp??"-"}℃｜湿度${weather.humidity??"-"}%｜风速${weather.wind??"-"}km/h｜降雨${weather.rain??"-"}%</td></tr>`;
+  }
+  const oddsRows=[
+    ["胜平负",`${home} ${mk.homeOdds?fmt(mk.homeOdds):"-"}｜平 ${mk.drawOdds?fmt(mk.drawOdds):"-"}｜${away} ${mk.awayOdds?fmt(mk.awayOdds):"-"}`],
+    ["大小球",`${mk.totalLine??"-"}｜大 ${mk.overOdds?fmt(mk.overOdds):"-"}｜小 ${mk.underOdds?fmt(mk.underOdds):"-"}`],
+    ["让球",`${home} ${mk.spreadLine??"-"} @ ${mk.spreadHomeOdds?fmt(mk.spreadHomeOdds):"-"}｜${away} ${mk.spreadLine!=null?fmt(-mk.spreadLine):"-"} @ ${mk.spreadAwayOdds?fmt(mk.spreadAwayOdds):"-"}`]
+  ];
+  let html=`<h3>${home} vs ${away}</h3>`;
+  if(time)html+=`<p class="muted">开赛时间：${new Date(time).toLocaleString()}</p>`;
+  html+=`<table><tbody>
+    ${weatherHtml}
+    <tr><td>模型因素</td><td>天气：${factors.weatherImpact}｜教练：${factors.coach}｜红牌：${factors.card}｜性质：${factors.nature}</td></tr>
+    ${oddsRows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("")}
+    <tr><td>模型概率</td><td>${home}胜 ${pct(result.modelProb.pHome)}｜平 ${pct(result.modelProb.pDraw)}｜${away}胜 ${pct(result.modelProb.pAway)}</td></tr>
+    <tr><td>比分池</td><td>${result.topScores.slice(0,6).map((s,i)=>`<span class="tag">${i===0?"主":i<=2?"防":"爆"} ${s.h}-${s.a} ${pct(s.p)}</span>`).join("")}</td></tr>
+  </tbody></table>`;
+
+  html+=`<h3>模型结论</h3><ul>${result.script.map(x=>`<li>${x}</li>`).join("")}</ul>`;
+  html+=`<h3>推荐优先级，金额留空由你填写</h3>`;
+  html+=`<table><thead><tr><th>优先级</th><th>玩法</th><th>方向</th><th>赔率</th><th>模型概率</th><th>EV</th><th>理由</th><th>你的额度</th></tr></thead><tbody>`;
+  result.recommendations.forEach((r,i)=>{
+    html+=`<tr>
+      <td>${badge(r.priority)}</td><td>${r.market}</td><td>${r.side}</td><td>${r.odds==="需填"?"需填":fmt(r.odds)}</td>
+      <td>${pct(r.probability)}</td><td class="${r.ev==null?'':(r.ev>0?'ok':'bad')}">${r.ev==null?"-":fmt(r.ev*100)+"%"}</td>
+      <td>${r.reason}${r.note?`｜${r.note}`:""}</td>
+      <td><input data-rec="${i}" placeholder="自己填"></td>
+    </tr>`;
+  });
+  html+=`</tbody></table>`;
+  html+=`<h3>看球中提醒</h3>
+  <table><thead><tr><th>时间</th><th>重点</th><th>处理</th></tr></thead><tbody>
+  <tr><td>0-15分钟</td><td>射正、禁区触球、角球</td><td>无高质量机会，不追大球</td></tr>
+  <tr><td>15-30分钟</td><td>弱队黄牌/犯规</td><td>早牌多，受让降权，穿盘和大球升权</td></tr>
+  <tr><td>半场</td><td>xG/射正是否匹配赔率</td><td>不匹配就重新算，不硬扛赛前判断</td></tr>
+  <tr><td>55-65分钟</td><td>换人方向</td><td>进攻换人升大球，防守换人升小球</td></tr>
+  <tr><td>70分钟后</td><td>领先方继续压还是回收</td><td>继续压防3-0/3-1，回收防赢球输盘</td></tr>
+  </tbody></table>`;
+  document.getElementById(targetId).innerHTML=html;
+}
+function saveCurrentAnalysis(){
+  if(!currentRecommendations.length||!selectedEvent){alert("暂无联网分析推荐。");return;}
+  saveRecs(selectedEvent.home_team+" vs "+selectedEvent.away_team,currentRecommendations);
+}
+function saveManualAnalysis(){
+  if(!lastManualRecommendations.length){alert("请先手动分析。");return;}
+  const name=(document.getElementById("mHome").value||"主队")+" vs "+(document.getElementById("mAway").value||"客队");
+  saveRecs(name,lastManualRecommendations);
+}
+function saveRecs(match,recs){
+  const review=JSON.parse(localStorage.getItem(LS_REVIEW)||"[]");
+  recs.filter(r=>r.priority!=="不碰").slice(0,8).forEach(r=>{
+    review.unshift({
+      id:Date.now()+"_"+Math.random().toString(16).slice(2),
+      time:new Date().toLocaleString(),
+      match, market:r.market, side:r.side, odds:r.odds, probability:fmt(r.probability*100),
+      ev:r.ev==null?"":fmt(r.ev*100), priority:r.priority, result:"未结算", stake:"", returnAmount:0, note:r.reason||""
+    });
+  });
+  localStorage.setItem(LS_REVIEW,JSON.stringify(review));
+  alert("已保存到复盘。");
+}
+
+// Dutching
+function addDutchRow(){
+  const tbody=document.querySelector("#dutchTable tbody");
+  const tr=document.createElement("tr");
+  tr.innerHTML=`<td><input value="1-1"></td><td><input type="number" step="0.01" value="7.0"></td><td><input type="number" step="0.1" value="10"></td><td><select><option>主剧本</option><option>防守剧本</option><option>防反剧本</option><option>爆点剧本</option><option selected>意外剧本</option></select></td><td><button class="small danger" onclick="removeRow(this)">删</button></td>`;
+  tbody.appendChild(tr);
+}
+function removeRow(btn){btn.closest("tr").remove()}
+function calcDutching(){
+  const budget=parseFloat(document.getElementById("dutchBudget").value||0);
+  const rows=[...document.querySelectorAll("#dutchTable tbody tr")];
+  const items=rows.map(r=>{const q=r.querySelectorAll("input,select");return{score:q[0].value,odds:parseFloat(q[1].value||0),weight:parseFloat(q[2].value||0),type:q[3].value}}).filter(x=>x.odds>1&&x.weight>0);
+  if(!items.length){document.getElementById("dutchResult").innerHTML="请输入有效比分。";return}
+  const denom=items.reduce((s,x)=>s+x.weight/x.odds,0);
+  let html=`<table><thead><tr><th>类型</th><th>比分</th><th>赔率</th><th>权重</th><th>建议比例</th><th>参考金额</th><th>回报</th></tr></thead><tbody>`;
+  items.forEach(x=>{
+    const stake=budget*(x.weight/x.odds)/denom;
+    html+=`<tr><td>${x.type}</td><td>${x.score}</td><td>${fmt(x.odds)}</td><td>${fmt(x.weight)}</td><td>${fmt((stake/budget)*100)}%</td><td>${budget?fmt(stake):"你填"}</td><td>${budget?fmt(stake*x.odds):"-"}</td></tr>`;
+  });
+  html+=`</tbody></table>`;
+  document.getElementById("dutchResult").innerHTML=html;
+}
+
+// Live
+function analyzeTriggers(){
+  const s=[...document.querySelectorAll(".trigger:checked")].map(x=>x.value);
+  let adv=[];
+  if(s.includes("no_shot"))adv.push("强队15分钟无射正：大球降权，强队深盘降权，先不追。");
+  if(s.includes("high_xg"))adv.push("高质量机会多：大球升权，波胆加2-1、3-1、2-2。");
+  if(s.includes("weak_yellow"))adv.push("弱队早牌：受让降权，强队穿盘和红牌剧本升权。");
+  if(s.includes("red_card"))adv.push("红牌出现：原剧本失效，必须重新按人数和比分计算。");
+  if(s.includes("favorite_slow"))adv.push("强队外围倒脚：让球危险，小球和小胜比分升权。");
+  if(s.includes("favorite_continue"))adv.push("领先方继续压：让球和大球升权，可防3-0/3-1。");
+  if(s.includes("favorite_stop"))adv.push("领先方回收：让球降权，防赢球输盘。");
+  if(s.includes("attacking_sub"))adv.push("进攻换人：最后25分钟进球概率上升，大球/下一球升权。");
+  if(s.includes("defensive_sub"))adv.push("防守换人：收比赛，小球和当前比分保护升权。");
+  if(s.includes("weather_drop"))adv.push("高温节奏下降：小球升权，但强队替补强仍防70分钟爆点。");
+  if(!adv.length)adv.push("暂无触发项，维持赛前剧本，不建议无理由加注。");
+  document.getElementById("triggerResult").innerHTML=adv.map(x=>`<p>• ${x}</p>`).join("");
+}
+function calcHedge(){
+  const A=parseFloat(document.getElementById("origStake").value||0), Oa=parseFloat(document.getElementById("origOdds").value||0), Oh=parseFloat(document.getElementById("hedgeOdds").value||0), mode=document.getElementById("hedgeMode").value, maxLoss=parseFloat(document.getElementById("maxLoss").value||0);
+  if(A<=0||Oa<=1||Oh<=1){document.getElementById("hedgeResult").innerHTML="请输入有效金额和赔率。";return;}
+  let H=A*Oa/Oh;
+  if(mode==="half")H/=2;
+  if(mode==="losscap")H=Math.max(0,(A-maxLoss)/(Oh-1));
+  const p1=A*Oa-A-H, p2=H*Oh-H-A;
+  document.getElementById("hedgeResult").innerHTML=`建议对冲金额：<b class="ok">${fmt(H)}</b><br>原方向打出净结果：<b class="${p1>=0?'ok':'bad'}">${fmt(p1)}</b><br>对冲方向打出净结果：<b class="${p2>=0?'ok':'bad'}">${fmt(p2)}</b>`;
+}
+
+// Review
+function renderReview(){
+  const data=JSON.parse(localStorage.getItem(LS_REVIEW)||"[]");
+  if(!data.length){document.getElementById("reviewList").innerHTML="暂无复盘记录。";renderStats();return;}
+  let html=`<table><thead><tr><th>时间</th><th>比赛</th><th>玩法</th><th>方向</th><th>赔率</th><th>概率</th><th>EV</th><th>级别</th><th>金额</th><th>结果</th><th>回收</th><th>备注</th><th></th></tr></thead><tbody>`;
+  data.forEach((r,i)=>{
+    html+=`<tr>
+      <td>${r.time}</td><td>${r.match}</td><td>${r.market}</td><td>${r.side}</td><td>${r.odds}</td><td>${r.probability||""}%</td><td>${r.ev||""}%</td><td>${r.priority}</td>
+      <td><input value="${r.stake||""}" onchange="updateReview(${i},'stake',this.value)" placeholder="你填"></td>
+      <td><select onchange="updateReview(${i},'result',this.value)">${["未结算","赢","输","走水","半赢","半输"].map(x=>`<option ${r.result===x?"selected":""}>${x}</option>`).join("")}</select></td>
+      <td><input type="number" value="${r.returnAmount||0}" onchange="updateReview(${i},'returnAmount',this.value)"></td>
+      <td><input value="${r.note||""}" onchange="updateReview(${i},'note',this.value)"></td>
+      <td><button class="small danger" onclick="deleteReview(${i})">删</button></td>
+    </tr>`;
+  });
+  html+=`</tbody></table>`;
+  document.getElementById("reviewList").innerHTML=html;
+  renderStats();
+}
+function updateReview(i,key,val){
+  const data=JSON.parse(localStorage.getItem(LS_REVIEW)||"[]");
+  if(!data[i])return;
+  data[i][key]=(key==="returnAmount")?parseFloat(val||0):val;
+  localStorage.setItem(LS_REVIEW,JSON.stringify(data));renderStats();
+}
+function deleteReview(i){const data=JSON.parse(localStorage.getItem(LS_REVIEW)||"[]");data.splice(i,1);localStorage.setItem(LS_REVIEW,JSON.stringify(data));renderReview();}
+function clearReview(){if(confirm("确定清空复盘？")){localStorage.removeItem(LS_REVIEW);renderReview();}}
+function settle(r){
+  const stake=parseFloat(r.stake||0),odds=parseFloat(r.odds||0);
+  if(!stake)return parseFloat(r.returnAmount||0)||0;
+  if(r.result==="赢")return stake*odds;
+  if(r.result==="输")return 0;
+  if(r.result==="走水")return stake;
+  if(r.result==="半赢")return stake+stake*(odds-1)/2;
+  if(r.result==="半输")return stake/2;
+  return parseFloat(r.returnAmount||0)||0;
+}
+function renderStats(){
+  const data=JSON.parse(localStorage.getItem(LS_REVIEW)||"[]").filter(r=>r.result&&r.result!=="未结算");
+  if(!data.length){document.getElementById("statsResult").innerHTML="暂无已结算统计。";return;}
+  const st=data.reduce((s,r)=>s+parseFloat(r.stake||0),0), rt=data.reduce((s,r)=>s+settle(r),0), profit=rt-st;
+  const wins=data.filter(r=>["赢","半赢"].includes(r.result)).length;
+  document.getElementById("statsResult").innerHTML=`已结算：${data.length}｜命中率：${fmt(wins/data.length*100)}%｜投入：${fmt(st)}｜回收：${fmt(rt)}｜净利润：<b class="${profit>=0?'ok':'bad'}">${fmt(profit)}</b>｜ROI：<b class="${profit>=0?'ok':'bad'}">${st?fmt(profit/st*100):0}%</b>`;
+}
+function exportData(){
+  const blob=new Blob([JSON.stringify({review:JSON.parse(localStorage.getItem(LS_REVIEW)||"[]"),version:"v3.3"},null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="football_model_v3_3_review.json";a.click();URL.revokeObjectURL(url);
+}
+function importData(e){
+  const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(d.review)localStorage.setItem(LS_REVIEW,JSON.stringify(d.review));renderReview();alert("导入成功");}catch(err){alert("导入失败")}};r.readAsText(f);
+}
+
+init();
+</script>
+</body>
+</html>

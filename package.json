@@ -1,0 +1,10 @@
+{
+  "name": "football-model-v3-4-complete",
+  "version": "3.4.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {}
+}

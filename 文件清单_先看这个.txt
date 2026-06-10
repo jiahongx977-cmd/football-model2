@@ -1,0 +1,17 @@
+解压后你必须看到这些文件：
+
+football_model_v3_4_complete/
+├─ index.html
+├─ package.json
+├─ vercel.json
+├─ .env.example
+├─ README_部署说明.txt
+└─ api/
+   ├─ sports.js
+   └─ odds.js
+
+注意：
+1. index.html 是网站首页。
+2. api 文件夹里的 sports.js / odds.js 不是网页，不能双击打开。
+3. 这个版本必须部署到 Vercel 后才能实现“朋友免填Key”。
+4. 如果你只看到 sports.js 和 odds.js，说明你进入了 api 文件夹，返回上一层就能看到 index.html。
