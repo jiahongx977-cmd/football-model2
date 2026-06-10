@@ -147,7 +147,7 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
 </head>
 <body>
 <header><h1>JAX的AI模型</h1>
-<p>联网赔率 + 天气/战意/教练/阵容/体能/裁判因素 + 动态比分推演 + Dutching三模式 + 滚球对冲OCR + 赛后复盘｜V7.2</p>
+<p>联网赔率 + 天气/战意/教练/阵容/体能/裁判因素 + 动态比分推演 + Dutching三模式 + 滚球对冲OCR + 赛后复盘｜V7.5</p>
 </header>
 <div class="notice">
   使用说明：API Key 仍然只放在 Vercel 环境变量 <b>THE_ODDS_API_KEY</b> 中，朋友打开网站不需要自己填 Key。
@@ -770,7 +770,7 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
       </div>
 </section>
 </main>
-<footer>JAX的AI模型｜V7.2 UI视觉统一优化版｜快捷入口精简、主按钮统一、预算与分配方式橙色描边。</footer>
+<footer>JAX的AI模型｜V7.5 合规按钮清理版｜删除顶部复制按钮按钮，保留合规风险提示。</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js">
 function previewDutchImage(e){
@@ -6203,21 +6203,9 @@ document.addEventListener("DOMContentLoaded", function(){
   }
 
   function ensureComplianceCopyButton(){
-    if(document.getElementById("jaxComplianceCopyBtn")) return;
-    const box = document.querySelector(".complianceBox");
-    if(!box) return;
-    const btn = document.createElement("button");
-    btn.id = "jaxComplianceCopyBtn";
-    btn.className = "btn";
-    btn.type = "button";
-    btn.textContent = "复制合规声明";
-    btn.onclick = function(){
-      const text = "本工具仅用于体育数据分析、概率模型学习、赔率结构研究与赛后复盘训练，不提供任何投注建议、带单服务、资金托管、代买服务或收益承诺。页面中出现的赔率、ROI、Dutching、回报等内容均为数学测算示例，不构成任何投资、博彩、法律或财务建议。请遵守所在地法律法规，理性观看体育赛事，未成年人请勿使用相关分析功能。";
-      navigator.clipboard && navigator.clipboard.writeText(text);
-      alert("已复制合规声明。");
-    };
-    box.appendChild(document.createElement("br"));
-    box.appendChild(btn);
+    // V7.5: 已按要求删除顶部复制按钮，保留合规声明文字本身。
+    const oldBtn = document.getElementById("jaxComplianceCopyBtn");
+    if(oldBtn) oldBtn.remove();
   }
 
   window.addEventListener("DOMContentLoaded", function(){
@@ -8508,7 +8496,7 @@ document.addEventListener("DOMContentLoaded", function(){
 </script>
 <script>
 
-/* V7.2 inherited duplicate review panel cleanup
+/* V7.5 inherited duplicate review panel cleanup
    只保留 新版复盘模块 v66ReviewPanel。
    隐藏旧版“赛后复盘历史记录”模块，避免页面出现两个重复区域。
 */
@@ -8616,7 +8604,7 @@ document.addEventListener("DOMContentLoaded", function(){
 
 <script>
 
-/* V7.2 dynamic scoreline engine + Dutching button order
+/* V7.5 dynamic scoreline engine + Dutching button order
    1. 本场波胆推荐不再使用固定模板，而是根据每场比赛的赔率结构、隐含概率、强弱关系、天气、教练、阵容、体能、裁判、盘口热度等重新推演。
    2. 不强制每场比赛必须不同；若两场比赛模型输入高度相似，结果可以相似，但必须由模型计算得出。
    3. API赔率显示平均赔率、隐含概率和盘口倾向。
@@ -8919,7 +8907,7 @@ document.addEventListener("DOMContentLoaded", function(){
         保护比分：<b>${rows[1]?.score||"-"}</b>、<b>${rows[2]?.score||"-"}</b>。
         下方波胆池由赔率结构与当前输入项动态生成，不再使用固定模板。
       </div>
-      <p class="small">V7.2 操作流程与盘口中文解释已执行：${new Date().toLocaleTimeString()}</p>
+      <p class="small">V7.5 操作流程与盘口中文解释已执行：${new Date().toLocaleTimeString()}</p>
     `;
   }
 
@@ -9019,7 +9007,7 @@ document.addEventListener("DOMContentLoaded", function(){
 
 
 <style>
-/* V7.2 首页流程优化 */
+/* V7.5 首页流程优化 */
 #online > .grid{display:block !important}
 #online > .grid > .card{width:100%;margin-bottom:18px}
 #matchList.v69MatchList{max-height:360px;overflow-y:auto;padding-right:8px}
@@ -9034,7 +9022,7 @@ document.addEventListener("DOMContentLoaded", function(){
 </style>
 <script>
 
-/* V7.2 flow UI + Chinese odds explanation
+/* V7.5 flow UI + Chinese odds explanation
    1. 首页改为：联网设置在上，近期比赛在下。
    2. 近期比赛固定高度滚动，不撑长页面。
    3. 近期比赛英文队名增加中文翻译。
@@ -9370,7 +9358,7 @@ document.addEventListener("DOMContentLoaded", function(){
 
 
 <style>
-/* V7.2: scoreline hierarchy + Dutching 3 modes */
+/* V7.5: scoreline hierarchy + Dutching 3 modes */
 .v70-mode-wrap{
   display:flex;align-items:center;gap:8px;flex-wrap:wrap;
   background:#fff7ed;border:2px solid #fb923c;border-radius:16px;
@@ -9388,7 +9376,7 @@ document.addEventListener("DOMContentLoaded", function(){
 .v70-mode-note{font-size:13px;color:#475569;line-height:1.65;margin-top:8px}
 </style>
 <script>
-/* V7.2 波胆动态推演 + Dutching三模式高亮版 */
+/* V7.5 波胆动态推演 + Dutching三模式高亮版 */
 (function(){
   function el(id){ return document.getElementById(id); }
   function num(v){ const n=parseFloat(String(v||"").replace(/[^\d.\-]/g,"")); return isFinite(n)?n:0; }
@@ -9668,7 +9656,7 @@ document.addEventListener("DOMContentLoaded", function(){
       </ul>
       <h3>当前主线</h3>
       <div class="result-box">当前主线比分：<b>${rows[0]?.score||"-"}</b>；保护比分：<b>${rows[1]?.score||"-"}</b>、<b>${rows[2]?.score||"-"}</b>。下方波胆池由赔率结构与当前输入项动态生成。</div>
-      <p class="small">V7.2 波胆权重离散推演已执行：${new Date().toLocaleTimeString()}</p>
+      <p class="small">V7.5 波胆权重离散推演已执行：${new Date().toLocaleTimeString()}</p>
     `;
   }
   window.jaxStableAnalyze=function(){
@@ -9884,7 +9872,7 @@ document.addEventListener("DOMContentLoaded", function(){
 
 
 <style>
-/* V7.2: budget highlight + cleaner trigger source + button flow */
+/* V7.5: budget highlight + cleaner trigger source + button flow */
 .v71-budget-wrap{
   background:#fff7ed;border:2px solid #fb923c;border-radius:16px;
   padding:10px 12px;box-shadow:0 6px 16px rgba(249,115,22,.10)
@@ -9901,7 +9889,7 @@ document.addEventListener("DOMContentLoaded", function(){
 .v71-trigger-table .v70-source-tag{margin:2px 4px 2px 0}
 </style>
 <script>
-/* V7.2 Dutching流程强化 + 触发来源精简版 */
+/* V7.5 Dutching流程强化 + 触发来源精简版 */
 (function(){
   function el(id){return document.getElementById(id);}
   function clamp(n,a,b){return Math.max(a,Math.min(b,n));}
@@ -10094,7 +10082,7 @@ document.addEventListener("DOMContentLoaded", function(){
 
 
 <style>
-/* V7.2 UI视觉统一优化版 */
+/* V7.5 UI视觉统一优化版 */
 :root{--jax-red:#dc2626;--jax-orange:#f97316;--jax-orange-bg:#fff7ed;}
 
 /* 快捷入口精简后，剩余入口尽量一排展示 */
@@ -10251,7 +10239,7 @@ button[onclick="fetchOdds()"]{
 }
 </style>
 <script>
-/* V7.2 UI视觉统一优化版 */
+/* V7.5 UI视觉统一优化版 */
 (function(){
   function el(id){return document.getElementById(id);}
 
@@ -10318,6 +10306,446 @@ button[onclick="fetchOdds()"]{
   setTimeout(v72ApplyUI,300);
   setTimeout(v72ApplyUI,1000);
   setTimeout(v72ApplyUI,2000);
+})();
+</script>
+
+
+<style>
+/* V7.5 UI细节精修版 */
+
+/* 顶部导航栏放大，并尽量填满一整行 */
+.tabs{
+  display:flex!important;
+  width:100%!important;
+  max-width:none!important;
+  gap:12px!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  flex-wrap:nowrap!important;
+}
+.tabs button{
+  flex:1 1 0!important;
+  min-width:0!important;
+  height:48px!important;
+  padding:0 14px!important;
+  border-radius:18px!important;
+  font-size:15px!important;
+  font-weight:900!important;
+  white-space:nowrap!important;
+}
+
+/* 快捷入口：世界杯两个保持橙色，其他联赛统一黑色 */
+.quickbar{
+  display:flex!important;
+  flex-wrap:nowrap!important;
+  gap:10px!important;
+  width:100%!important;
+}
+.quickbar button{
+  flex:1 1 0!important;
+  min-width:0!important;
+  height:44px!important;
+  border-radius:12px!important;
+  font-size:14px!important;
+  font-weight:900!important;
+  white-space:nowrap!important;
+}
+.quickbar .worldcup,
+.quickbar .winner{
+  background:#f97316!important;
+  color:#fff!important;
+}
+.quickbar .league{
+  background:#111827!important;
+  color:#fff!important;
+}
+
+/* Dutching页不要整块橙色，也不要表格输入框满屏橙色 */
+#dutch.card{
+  border:1px solid var(--line)!important;
+  background:#fff!important;
+  box-shadow:0 6px 18px rgba(15,23,42,.05)!important;
+}
+#dutch table input,
+#dutchTable input,
+#inlineDutchTable input{
+  border:1px solid #d1d5db!important;
+  border-radius:8px!important;
+  background:#fff!important;
+  font-weight:500!important;
+  box-shadow:none!important;
+}
+
+/* 只保留总预算和分配方式的橙色描边 */
+#dutchBank,
+#inlineDutchBank,
+#jaxDutchMode,
+#inlineDutchMode{
+  border:2px solid #f97316!important;
+  border-radius:12px!important;
+  background:#fff!important;
+  font-weight:800!important;
+  box-shadow:none!important;
+}
+
+/* 去掉预算大面积高亮，只保留输入框描边 */
+.v71-budget-wrap{
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  padding:0!important;
+}
+.v71-budget-wrap label{
+  color:#9a3412!important;
+  font-weight:900!important;
+}
+
+/* 去掉分配方式大面积高亮，只保留选择框描边 */
+.v70-mode-wrap{
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  padding:0!important;
+}
+.v70-mode-wrap label{
+  color:#9a3412!important;
+  font-weight:900!important;
+}
+.v70-mode-help{
+  color:#9a3412!important;
+  background:transparent!important;
+}
+
+/* 小屏避免导航挤爆 */
+@media (max-width:900px){
+  .tabs{flex-wrap:wrap!important}
+  .tabs button{flex:1 1 30%!important}
+  .quickbar{flex-wrap:wrap!important}
+  .quickbar button{flex:1 1 30%!important}
+}
+</style>
+<script>
+/* V7.5 UI细节精修版 */
+(function(){
+  function applyV73(){
+    document.querySelectorAll(".quickbar .league").forEach(b=>{
+      b.style.background="#111827";
+      b.style.color="#fff";
+    });
+    document.querySelectorAll(".quickbar .worldcup,.quickbar .winner").forEach(b=>{
+      b.style.background="#f97316";
+      b.style.color="#fff";
+    });
+    document.querySelectorAll("#dutchTable input,#inlineDutchTable input").forEach(inp=>{
+      inp.style.border="1px solid #d1d5db";
+      inp.style.borderRadius="8px";
+      inp.style.background="#fff";
+      inp.style.fontWeight="500";
+      inp.style.boxShadow="none";
+    });
+    ["dutchBank","inlineDutchBank","jaxDutchMode","inlineDutchMode"].forEach(id=>{
+      const x=document.getElementById(id);
+      if(x){
+        x.style.border="2px solid #f97316";
+        x.style.borderRadius="12px";
+        x.style.background="#fff";
+        x.style.fontWeight="800";
+        x.style.boxShadow="none";
+      }
+    });
+  }
+  window.addEventListener("DOMContentLoaded",applyV73);
+  setTimeout(applyV73,300);
+  setTimeout(applyV73,1000);
+  setTimeout(applyV73,2000);
+})();
+</script>
+
+
+<style>
+/* V7.5 按钮视觉统一 + 表格专业数据面板版 */
+:root{
+  --jax-red:#dc2626;
+  --jax-red-dark:#b91c1c;
+  --jax-dark:#0f172a;
+  --jax-line:#e5e7eb;
+  --jax-soft:#f8fafc;
+  --jax-blue-soft:#eff6ff;
+}
+
+/* 统一按钮基础 */
+button,.btn{
+  transition:transform .12s ease, box-shadow .12s ease, filter .12s ease!important;
+}
+button:hover,.btn:hover{
+  transform:translateY(-1px);
+}
+button:active,.btn:active{
+  transform:translateY(0);
+}
+
+/* 主按钮：红色，只用于关键下一步 */
+.btn-main,
+.v74-main,
+.v72-main-red,
+.v71-red-action,
+.v70-main-red,
+.v69-red-action{
+  background:var(--jax-red)!important;
+  border:1px solid var(--jax-red)!important;
+  color:#fff!important;
+  min-height:46px!important;
+  min-width:156px!important;
+  padding:12px 20px!important;
+  border-radius:16px!important;
+  font-size:15px!important;
+  font-weight:900!important;
+  box-shadow:0 8px 18px rgba(220,38,38,.18)!important;
+  line-height:1.2!important;
+}
+.btn-main:hover,
+.v74-main:hover,
+.v72-main-red:hover,
+.v71-red-action:hover{
+  background:var(--jax-red-dark)!important;
+  border-color:var(--jax-red-dark)!important;
+}
+
+/* 次按钮：黑色，用于刷新、同步、复制、获取列表等次级动作 */
+.btn-secondary,
+.v74-secondary{
+  background:var(--jax-dark)!important;
+  border:1px solid var(--jax-dark)!important;
+  color:#fff!important;
+  min-height:42px!important;
+  min-width:126px!important;
+  padding:10px 16px!important;
+  border-radius:15px!important;
+  font-size:14px!important;
+  font-weight:850!important;
+  box-shadow:0 6px 14px rgba(15,23,42,.13)!important;
+}
+
+/* 普通按钮：白色 */
+.btn-light,
+.v74-light{
+  background:#fff!important;
+  color:#0f172a!important;
+  border:1px solid #dbe3ef!important;
+  min-height:40px!important;
+  padding:9px 15px!important;
+  border-radius:14px!important;
+  font-weight:800!important;
+  box-shadow:0 4px 10px rgba(15,23,42,.04)!important;
+}
+
+/* 删除按钮：保留红色但缩小，明确是危险操作，不和主按钮混淆 */
+.btn-danger,
+button.deleteBtn,
+#dutchTable button,
+#inlineDutchTable button{
+  background:#ef4444!important;
+  color:#fff!important;
+  border:1px solid #ef4444!important;
+  min-width:64px!important;
+  min-height:36px!important;
+  padding:8px 12px!important;
+  border-radius:999px!important;
+  font-size:13px!important;
+  font-weight:900!important;
+  box-shadow:none!important;
+}
+
+/* 表格专业数据面板化 */
+table{
+  border:1px solid #e5e7eb!important;
+  border-radius:16px!important;
+  overflow:hidden!important;
+  background:#fff!important;
+  box-shadow:0 8px 22px rgba(15,23,42,.045)!important;
+}
+thead th, th{
+  background:linear-gradient(180deg,#f8fafc 0%,#eef2f7 100%)!important;
+  color:#0f172a!important;
+  font-size:12px!important;
+  font-weight:900!important;
+  letter-spacing:.02em!important;
+  border-bottom:1px solid #dbe3ef!important;
+}
+td{
+  color:#111827!important;
+  font-size:13px!important;
+  border-bottom:1px solid #edf2f7!important;
+}
+tbody tr:nth-child(even) td{
+  background:#fbfdff!important;
+}
+tbody tr:hover td{
+  background:#f8fafc!important;
+}
+td b{
+  color:#020617!important;
+}
+
+/* 重点列数字更清晰 */
+td:nth-child(3),
+td:nth-child(4),
+td:nth-child(5),
+td:nth-child(6),
+td:nth-child(7),
+td:nth-child(8){
+  font-variant-numeric:tabular-nums;
+}
+
+/* 波胆推荐表：像专业模型输出卡 */
+.modelScoresBox{
+  border:1px solid #fde68a!important;
+  background:linear-gradient(180deg,#fffbeb 0%,#fff7ed 100%)!important;
+  border-radius:18px!important;
+  padding:16px!important;
+}
+#modelScoreTable{
+  box-shadow:0 8px 22px rgba(146,64,14,.06)!important;
+}
+#modelScoreTable td:nth-child(3) b{
+  display:inline-block;
+  background:#0f172a;
+  color:#fff!important;
+  padding:4px 10px;
+  border-radius:999px;
+  min-width:48px;
+  text-align:center;
+}
+.v70-source-tag{
+  background:#eef2ff!important;
+  border:1px solid #c7d2fe!important;
+  color:#3730a3!important;
+  border-radius:999px!important;
+  padding:3px 9px!important;
+  font-size:12px!important;
+  font-weight:750!important;
+}
+
+/* Dutching表：金额/收益突出 */
+#dutchResult table td:nth-child(5) b,
+#inlineDutchResult table td:nth-child(5) b{
+  color:#0f766e!important;
+}
+#dutchResult table td:nth-child(7) b,
+#inlineDutchResult table td:nth-child(7) b{
+  color:#b45309!important;
+}
+
+/* 复盘历史/结果盒子更像数据记录 */
+.result-box,
+.historyBox,
+.apiOddsBox,
+.inlineDutch{
+  border-radius:16px!important;
+}
+#review .card,
+#omission .card{
+  border-radius:18px!important;
+}
+
+/* 按钮区域间距统一 */
+.flex{
+  gap:12px!important;
+}
+.v71-action-panel,
+.v71-dutch-flow{
+  gap:12px!important;
+}
+
+/* 手机端表格可横向滚动，避免挤爆 */
+@media (max-width:900px){
+  table{display:block!important;overflow-x:auto!important;white-space:nowrap!important}
+  .btn-main,.v74-main,.v72-main-red,.v71-red-action{min-width:132px!important}
+}
+</style>
+<script>
+/* V7.5 按钮视觉统一 + 表格专业数据面板版 */
+(function(){
+  function txt(b){return (b&&b.innerText||"").trim();}
+  function classifyButtons(){
+    document.querySelectorAll("button,.btn").forEach(b=>{
+      const t=txt(b);
+
+      // 删除类永远是危险小按钮
+      if(t==="删除" || t.includes("清空")){
+        b.classList.add("btn-danger");
+        return;
+      }
+
+      // 主动作：用户下一步必须点的核心计算/导入/分析
+      if(
+        t.includes("获取近期比赛") ||
+        t.includes("把API赔率带入模型") ||
+        t.includes("开始完整模型分析") ||
+        t.includes("AI计算权重") ||
+        t.includes("AI计算波胆权重") ||
+        t.includes("计算本场波胆 Dutching") ||
+        t.includes("计算 Dutching + ROI") ||
+        t.includes("计算对冲") ||
+        t.includes("生成") && t.includes("方案")
+      ){
+        b.classList.remove("blue","green","orange","primary");
+        b.classList.add("btn-main","v74-main");
+        return;
+      }
+
+      // 次动作：刷新、同步、复制、保存、查看、获取列表
+      if(
+        t.includes("刷新") ||
+        t.includes("同步") ||
+        t.includes("复制") ||
+        t.includes("保存") ||
+        t.includes("查看") ||
+        t.includes("获取足球赛事列表") ||
+        t.includes("导出") ||
+        t.includes("OCR")
+      ){
+        b.classList.remove("blue","green","orange","primary");
+        b.classList.add("btn-secondary","v74-secondary");
+        return;
+      }
+
+      // 普通动作
+      if(t.includes("使用示例") || t.includes("添加一行") || t==="-" || t==="+1" || t==="-1"){
+        b.classList.add("btn-light","v74-light");
+      }
+    });
+  }
+
+  function polishTables(){
+    document.querySelectorAll("table").forEach(t=>t.classList.add("v74-data-table"));
+  }
+
+  function apply(){
+    classifyButtons();
+    polishTables();
+  }
+
+  window.addEventListener("DOMContentLoaded",apply);
+  setTimeout(apply,300);
+  setTimeout(apply,1000);
+  setTimeout(apply,2000);
+})();
+</script>
+
+
+<style>
+/* V7.5 合规按钮清理版 */
+#jaxComplianceCopyBtn{display:none!important}
+</style>
+<script>
+(function(){
+  function removeComplianceCopyBtn(){
+    document.querySelectorAll("#jaxComplianceCopyBtn").forEach(b=>b.remove());
+  }
+  window.addEventListener("DOMContentLoaded", removeComplianceCopyBtn);
+  setTimeout(removeComplianceCopyBtn,300);
+  setTimeout(removeComplianceCopyBtn,1000);
 })();
 </script>
 
