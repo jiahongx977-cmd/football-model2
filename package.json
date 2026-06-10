@@ -1,6 +1,6 @@
 {
-  "name": "jax-ai-model-v5-9-compliance-label",
-  "version": "5.9.0",
+  "name": "jax-ai-model-v6-1-review-history-save-fix",
+  "version": "6.1.0",
   "private": true,
   "type": "module",
   "engines": {

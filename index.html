@@ -109,6 +109,16 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
 .complianceBox b{color:#7c2d12}
 .complianceMini{background:#f8fafc;border:1px dashed #cbd5e1;color:#475569;border-radius:12px;padding:10px 12px;margin:10px 0;font-size:12.5px;line-height:1.6}
 .safeTag{display:inline-block;background:#ecfdf5;border:1px solid #86efac;color:#166534;border-radius:999px;padding:2px 8px;margin:2px;font-size:12px}
+
+.friendlyHistoryCard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin:12px 0;box-shadow:0 4px 14px rgba(15,23,42,.04)}
+.friendlyHistoryCard summary{cursor:pointer;font-weight:800;line-height:1.55}
+.historyMeta{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.historyMeta span{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:4px 10px;font-size:12px;color:#334155}
+.historyTable{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px}
+.historyTable th,.historyTable td{border-bottom:1px solid #e5e7eb;padding:8px;text-align:left}
+.historyTable th{background:#f8fafc;font-weight:800}
+.historySummaryText{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px;margin-top:10px;line-height:1.6;white-space:pre-wrap}
+.techJsonBox{background:#0f172a;color:#dbeafe;border-radius:10px;padding:10px;margin-top:10px;font-size:12px;white-space:pre-wrap;max-height:360px;overflow:auto}
 </style>
 </head>
 <body>
@@ -737,7 +747,7 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
       </div>
 </section>
 </main>
-<footer>JAX的AI模型｜V5.9 合规标注版｜体育数据分析、概率模型学习与赛后复盘训练工具。</footer>
+<footer>JAX的AI模型｜V6.1 赛后复盘历史保存修正版｜修复保存后历史为空，复盘记录中文卡片显示。</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js">
 function previewDutchImage(e){
@@ -6190,6 +6200,484 @@ document.addEventListener("DOMContentLoaded", function(){
   window.addEventListener("DOMContentLoaded", function(){
     applyComplianceText();
     ensureComplianceCopyButton();
+  });
+})();
+
+</script>
+<script>
+
+/* V6.0 friendly history renderer
+   把 Dutching / 赛后复盘 / 模型反馈历史记录改成人能看懂的卡片和表格。
+   技术 JSON 默认收起，仅作为详细备份。
+*/
+(function(){
+  const DUTCH_KEYS = ["jax_dutch_history_v58","jax_dutch_history_v54","jax_dutch_history_v53","jax_dutch_history_v51"];
+  const REVIEW_KEYS = ["jax_review_history_v57","jax_review_history_v58","jax_review_history_v54","jax_review_history_v51"];
+  const FEEDBACK_KEYS = ["jax_feedback_history_v58","jax_omission_history_v57"];
+
+  function el(id){ return document.getElementById(id); }
+  function safe(v){ return (v === undefined || v === null || v === "") ? "-" : String(v); }
+  function money(v){
+    const n = Number(v);
+    return isFinite(n) ? n.toFixed(2) : safe(v);
+  }
+  function esc(s){
+    return safe(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  function readFirstAvailable(keys){
+    for(const k of keys){
+      const raw = localStorage.getItem(k);
+      if(raw){
+        try{
+          const arr = JSON.parse(raw);
+          if(Array.isArray(arr)) return {key:k, arr};
+        }catch(e){}
+      }
+    }
+    return {key:keys[0], arr:[]};
+  }
+
+  function writeAll(keys, arr){
+    localStorage.setItem(keys[0], JSON.stringify(arr.slice(0,200)));
+  }
+
+  function normalizeDutchRecord(x){
+    const rows = [];
+    const calcRows = x.lastCalculation && Array.isArray(x.lastCalculation.rows) ? x.lastCalculation.rows : null;
+
+    if(calcRows){
+      calcRows.forEach(r=>{
+        rows.push({
+          item: r.item || r.score || r.result || "-",
+          odds: r.odds,
+          weight: r.weight,
+          stake: r.stake,
+          hitReturn: r.hitReturn,
+          net: r.net,
+          roi: r.roi
+        });
+      });
+    }else if(Array.isArray(x.rows)){
+      x.rows.forEach(r=>{
+        rows.push({
+          item: r.item || r.score || r.result || r.scene || "-",
+          odds: r.odds,
+          weight: r.weight,
+          stake: r.stake || r.suggest || r.amount || "",
+          hitReturn: r.hitReturn || "",
+          net: r.net || "",
+          roi: r.roi || ""
+        });
+      });
+    }
+
+    return {
+      module: x.module || "波胆/冠军 Dutching",
+      sport: x.sport || x.league || "未识别赛事",
+      match: x.match || x.matchName || "未选择比赛",
+      startTime: x.startTime || x.commenceTime || "未识别开赛时间",
+      savedAt: x.savedAt || x.time || "未识别保存时间",
+      note: x.note || "",
+      budget: x.budget || (x.lastCalculation && x.lastCalculation.budget) || "",
+      mode: x.mode || (x.lastCalculation && x.lastCalculation.mode) || "",
+      bestItem: x.bestItem || (x.lastCalculation && (x.lastCalculation.bestItem || x.lastCalculation.bestScore)) || "",
+      bestNet: x.bestNet ?? (x.lastCalculation && x.lastCalculation.bestNet),
+      worstItem: x.worstItem || (x.lastCalculation && (x.lastCalculation.worstItem || x.lastCalculation.worstScore)) || "",
+      worstNet: x.worstNet ?? (x.lastCalculation && x.lastCalculation.worstNet),
+      uncoveredRisk: x.uncoveredRisk ?? (x.lastCalculation && x.lastCalculation.uncoveredRisk),
+      resultText: x.resultText || x.htmlText || (x.lastCalculation && x.lastCalculation.htmlText) || "",
+      rows,
+      raw:x
+    };
+  }
+
+  function renderDutchCard(x, i){
+    const r = normalizeDutchRecord(x);
+    const rowsHtml = r.rows.length ? r.rows.map(row=>`
+      <tr>
+        <td><b>${esc(row.item)}</b></td>
+        <td>${esc(row.odds)}</td>
+        <td>${esc(row.weight)}${String(row.weight).includes("%") ? "" : "%"}</td>
+        <td>${esc(money(row.stake))}</td>
+        <td>${esc(money(row.hitReturn))}</td>
+        <td>${esc(money(row.net))}</td>
+        <td>${esc(row.roi)}</td>
+      </tr>
+    `).join("") : `<tr><td colspan="7">这条记录没有保存到明细行，建议重新计算后再保存。</td></tr>`;
+
+    const title = `${esc(r.sport)}｜${esc(r.match)}｜${esc(r.startTime)}`;
+    const subtitle = `保存：${esc(r.savedAt)}｜模块：${esc(r.module)}｜预算：${esc(r.budget)}${r.note ? "｜备注：" + esc(r.note) : ""}`;
+
+    return `
+      <div class="friendlyHistoryCard">
+        <details>
+          <summary>
+            ${title}<br>
+            <span class="small">${subtitle}</span>
+          </summary>
+
+          <div class="historyMeta">
+            <span>分配方式：${esc(r.mode)}</span>
+            <span>最好命中：${esc(r.bestItem || "-")} ${r.bestNet !== undefined ? "｜理论净值 " + esc(money(r.bestNet)) : ""}</span>
+            <span>最差命中：${esc(r.worstItem || "-")} ${r.worstNet !== undefined ? "｜理论净值 " + esc(money(r.worstNet)) : ""}</span>
+            <span>未覆盖风险：${r.uncoveredRisk !== undefined ? esc(money(r.uncoveredRisk)) : "-"}</span>
+          </div>
+
+          <table class="historyTable">
+            <thead>
+              <tr>
+                <th>结果/比分</th>
+                <th>赔率</th>
+                <th>AI权重</th>
+                <th>建议模拟金额</th>
+                <th>命中回报</th>
+                <th>理论净值</th>
+                <th>ROI</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+
+          ${r.resultText ? `<div class="historySummaryText"><b>结果摘要：</b>\n${esc(r.resultText)}</div>` : ""}
+
+          <details style="margin-top:10px">
+            <summary>技术详情 JSON</summary>
+            <div class="techJsonBox">${esc(JSON.stringify(r.raw,null,2))}</div>
+          </details>
+        </details>
+      </div>
+    `;
+  }
+
+  window.jaxRenderDutchHistory = function(){
+    const box = el("dutchHistoryList");
+    if(!box) return false;
+    const data = readFirstAvailable(DUTCH_KEYS);
+    const arr = data.arr;
+    if(!arr.length){
+      box.innerHTML = "暂无历史记录。";
+      return false;
+    }
+    box.innerHTML = arr.map(renderDutchCard).join("");
+    return false;
+  };
+
+  const oldSaveDutch = window.jaxSaveDutchHistory;
+  window.jaxSaveDutchHistory = function(){
+    if(typeof oldSaveDutch === "function"){
+      oldSaveDutch();
+    }else{
+      const data = readFirstAvailable(DUTCH_KEYS);
+      data.arr.unshift({
+        module:"波胆/冠军 Dutching",
+        savedAt:new Date().toLocaleString(),
+        note:"",
+        resultText:"旧版保存入口未找到。"
+      });
+      writeAll(DUTCH_KEYS, data.arr);
+    }
+    setTimeout(()=>window.jaxRenderDutchHistory(), 50);
+    return false;
+  };
+
+  window.jaxClearDutchHistory = function(){
+    if(confirm("确定清空 Dutching 历史？")){
+      DUTCH_KEYS.forEach(k=>localStorage.removeItem(k));
+      window.jaxRenderDutchHistory();
+    }
+    return false;
+  };
+
+  function renderReviewCard(x){
+    const title = `${esc(x.sport || "未识别赛事")}｜${esc(x.match || x.reviewMatch || x.noteMatch || "未选择比赛")}｜${esc(x.startTime || "未识别开赛时间")}`;
+    const sub = `保存：${esc(x.savedAt || x.time || "-")}｜实际比分：${esc(x.finalScore || x.reviewScore || "-")}｜结果：${esc(x.hitResult || x.reviewResult || "-")}｜误差：${esc(x.errorType || "-")}`;
+    return `
+      <div class="friendlyHistoryCard">
+        <details>
+          <summary>${title}<br><span class="small">${sub}</span></summary>
+          <div class="historyMeta">
+            <span>模块：赛后复盘</span>
+            <span>比赛：${esc(x.match || x.reviewMatch || "-")}</span>
+            <span>实际比分：${esc(x.finalScore || x.reviewScore || "-")}</span>
+            <span>模型判断：${esc(x.hitResult || x.reviewResult || "-")}</span>
+          </div>
+          ${x.prematchAnalysis ? `<div class="historySummaryText"><b>赛前AI推理：</b>\n${esc(x.prematchAnalysis)}</div>` : ""}
+          ${x.scorelineRecommendation ? `<div class="historySummaryText"><b>赛前波胆推荐：</b>\n${esc(x.scorelineRecommendation)}</div>` : ""}
+          ${x.reviewNote ? `<div class="historySummaryText"><b>赛后复盘备注：</b>\n${esc(x.reviewNote)}</div>` : ""}
+          <details style="margin-top:10px"><summary>技术详情 JSON</summary><div class="techJsonBox">${esc(JSON.stringify(x,null,2))}</div></details>
+        </details>
+      </div>
+    `;
+  }
+
+  window.jaxRenderReviewLoopHistory = function(){
+    const box = el("reviewLoopHistoryList") || el("reviewHistoryList");
+    if(!box) return false;
+    const data = readFirstAvailable(REVIEW_KEYS);
+    if(!data.arr.length){
+      box.innerHTML = "暂无赛后复盘历史。";
+      return false;
+    }
+    box.innerHTML = data.arr.map(renderReviewCard).join("");
+    return false;
+  };
+
+  window.jaxRenderReviewHistory = window.jaxRenderReviewLoopHistory;
+
+  function renderFeedbackCard(x){
+    const title = `${esc(x.type || "反馈")}｜${esc(x.match || "未选择比赛")}｜${esc(x.level || "一般")}`;
+    const sub = `保存：${esc(x.savedAt || "-")}｜赛事：${esc(x.sport || "-")}｜开赛：${esc(x.startTime || "-")}`;
+    return `
+      <div class="friendlyHistoryCard">
+        <details>
+          <summary>${title}<br><span class="small">${sub}</span></summary>
+          <div class="historySummaryText"><b>反馈内容：</b>\n${esc(x.content || x.text || "-")}</div>
+          ${x.adminNote ? `<div class="historySummaryText"><b>处理备注：</b>\n${esc(x.adminNote)}</div>` : ""}
+          <details style="margin-top:10px"><summary>技术详情 JSON</summary><div class="techJsonBox">${esc(JSON.stringify(x,null,2))}</div></details>
+        </details>
+      </div>
+    `;
+  }
+
+  window.jaxRenderFeedbackHistory = function(){
+    const box = el("feedbackHistoryList") || el("omissionHistoryList");
+    if(!box) return false;
+    const data = readFirstAvailable(FEEDBACK_KEYS);
+    if(!data.arr.length){
+      box.innerHTML = "暂无反馈记录。";
+      return false;
+    }
+    box.innerHTML = data.arr.map(renderFeedbackCard).join("");
+    return false;
+  };
+
+  window.jaxRenderOmissionHistory = window.jaxRenderFeedbackHistory;
+
+  function bindHistoryButtons(){
+    Array.from(document.querySelectorAll("button")).forEach(btn=>{
+      const t = (btn.innerText || "").trim();
+      if(t.includes("查看历史记录")) btn.onclick = window.jaxRenderDutchHistory;
+      if(t.includes("清空历史记录")) btn.onclick = window.jaxClearDutchHistory;
+      if(t.includes("查看复盘历史")) btn.onclick = window.jaxRenderReviewLoopHistory;
+      if(t.includes("查看反馈记录")) btn.onclick = window.jaxRenderFeedbackHistory;
+    });
+  }
+
+  window.addEventListener("DOMContentLoaded", function(){
+    bindHistoryButtons();
+    window.jaxRenderDutchHistory();
+    window.jaxRenderReviewLoopHistory();
+    window.jaxRenderFeedbackHistory();
+  });
+})();
+
+</script>
+<script>
+
+/* V6.1 review history save fix
+   修复赛后复盘保存后，查看历史仍为空的问题。
+   兼容旧字段、V5.7闭环字段、V5.9/V6.0历史显示。
+*/
+(function(){
+  const REVIEW_KEYS = [
+    "jax_review_history_v61",
+    "jax_review_history_v57",
+    "jax_review_history_v58",
+    "jax_review_history_v54",
+    "jax_review_history_v51"
+  ];
+
+  function el(id){ return document.getElementById(id); }
+  function val(id){
+    const x = el(id);
+    if(!x) return "";
+    return (x.value || x.innerText || "").trim();
+  }
+  function setVal(id, v){
+    const x = el(id);
+    if(!x) return false;
+    if("value" in x) x.value = v || "";
+    else x.innerText = v || "";
+    return true;
+  }
+  function esc(s){
+    return String(s === undefined || s === null || s === "" ? "-" : s)
+      .replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  function activeSportName(){
+    const s = el("sportSelect") || el("sport") || Array.from(document.querySelectorAll("select")).find(x=>(x.value||"").includes("soccer_"));
+    if(s && s.options && s.selectedIndex >= 0) return s.options[s.selectedIndex].text || s.value || "";
+    return "";
+  }
+
+  function selectedMatchInfo(){
+    let name = "", start = "";
+    if(window.selectedMatch){
+      if(window.selectedMatch.home_team && window.selectedMatch.away_team) name = window.selectedMatch.home_team + " vs " + window.selectedMatch.away_team;
+      else name = window.selectedMatch.title || window.selectedMatch.name || "";
+      start = window.selectedMatch.commence_time || window.selectedMatch.time || "";
+    }
+
+    const text = document.body.innerText || "";
+    if(!name){
+      const m = text.match(/已选择：\s*([^\n]+)/);
+      if(m && m[1]) name = m[1].trim();
+    }
+    if(!start){
+      const t = text.match(/已选择：\s*[^\n]+\n\s*([0-9]{4}[\/\-][0-9]{1,2}[\/\-][0-9]{1,2}[^\n]*)/);
+      if(t && t[1]) start = t[1].trim();
+    }
+
+    return {
+      sport: activeSportName() || val("reviewLoopSport") || "未识别赛事",
+      match: name || val("reviewLoopMatch") || val("reviewMatch") || val("noteMatch") || "未选择比赛",
+      startTime: start || val("reviewLoopStart") || "未识别开赛时间"
+    };
+  }
+
+  function readArray(){
+    for(const k of REVIEW_KEYS){
+      const raw = localStorage.getItem(k);
+      if(raw){
+        try{
+          const arr = JSON.parse(raw);
+          if(Array.isArray(arr) && arr.length) return arr;
+        }catch(e){}
+      }
+    }
+    return [];
+  }
+
+  function writeArray(arr){
+    localStorage.setItem(REVIEW_KEYS[0], JSON.stringify(arr.slice(0,300)));
+  }
+
+  function collectPrematchAnalysis(){
+    return val("reviewLoopPrematch") ||
+      val("reviewBet") ||
+      ((el("analysisResult") || {}).innerText || "") ||
+      "未带入赛前AI分析。";
+  }
+
+  function collectScorelineRecommendation(){
+    return val("reviewLoopScorelines") ||
+      ((el("modelScoreTable") || {}).innerText || "") ||
+      "未带入赛前波胆推荐。";
+  }
+
+  function readReviewRecord(){
+    const info = selectedMatchInfo();
+    return {
+      module: "赛后复盘",
+      sport: val("reviewLoopSport") || info.sport,
+      match: val("reviewLoopMatch") || val("reviewMatch") || val("noteMatch") || info.match,
+      startTime: val("reviewLoopStart") || info.startTime,
+      savedAt: new Date().toLocaleString(),
+
+      prematchAnalysis: collectPrematchAnalysis(),
+      scorelineRecommendation: collectScorelineRecommendation(),
+
+      finalScore: val("reviewLoopFinalScore") || val("reviewScore") || "",
+      hitResult: val("reviewLoopHit") || val("reviewResult") || "",
+      errorType: val("reviewLoopErrorType") || val("noteType") || "",
+      reviewNote: val("reviewLoopNote") || val("reviewNote") || val("noteText") || val("reviewHistoryNote") || "",
+
+      legacyFields: {
+        reviewMatch: val("reviewMatch"),
+        reviewScore: val("reviewScore"),
+        reviewBet: val("reviewBet"),
+        reviewResult: val("reviewResult"),
+        reviewNote: val("reviewNote"),
+        noteMatch: val("noteMatch"),
+        noteType: val("noteType"),
+        noteLevel: val("noteLevel"),
+        noteText: val("noteText")
+      }
+    };
+  }
+
+  function renderReviewCard(x){
+    const title = `${esc(x.sport || "未识别赛事")}｜${esc(x.match || x.reviewMatch || x.noteMatch || "未选择比赛")}｜${esc(x.startTime || "未识别开赛时间")}`;
+    const sub = `保存：${esc(x.savedAt || x.time || "-")}｜实际比分：${esc(x.finalScore || x.reviewScore || "-")}｜结果：${esc(x.hitResult || x.reviewResult || "-")}｜误差：${esc(x.errorType || "-")}`;
+    return `
+      <div class="friendlyHistoryCard">
+        <details>
+          <summary>${title}<br><span class="small">${sub}</span></summary>
+          <div class="historyMeta">
+            <span>模块：赛后复盘</span>
+            <span>比赛：${esc(x.match || x.reviewMatch || "-")}</span>
+            <span>实际比分：${esc(x.finalScore || x.reviewScore || "-")}</span>
+            <span>模型判断：${esc(x.hitResult || x.reviewResult || "-")}</span>
+            <span>误差类型：${esc(x.errorType || "-")}</span>
+          </div>
+          ${x.prematchAnalysis ? `<div class="historySummaryText"><b>赛前AI推理：</b>\n${esc(x.prematchAnalysis)}</div>` : ""}
+          ${x.scorelineRecommendation ? `<div class="historySummaryText"><b>赛前波胆推荐：</b>\n${esc(x.scorelineRecommendation)}</div>` : ""}
+          ${x.reviewNote ? `<div class="historySummaryText"><b>赛后复盘备注：</b>\n${esc(x.reviewNote)}</div>` : ""}
+          <details style="margin-top:10px"><summary>技术详情 JSON</summary><div class="techJsonBox">${esc(JSON.stringify(x,null,2))}</div></details>
+        </details>
+      </div>
+    `;
+  }
+
+  window.jaxSaveReviewLoopHistory = function(){
+    const arr = readArray();
+    arr.unshift(readReviewRecord());
+    writeArray(arr);
+    window.jaxRenderReviewLoopHistory();
+    return false;
+  };
+
+  window.jaxSaveReviewHistory = window.jaxSaveReviewLoopHistory;
+
+  window.jaxRenderReviewLoopHistory = function(){
+    const box = el("reviewLoopHistoryList") || el("reviewHistoryList");
+    if(!box) return false;
+
+    const arr = readArray();
+    if(!arr.length){
+      box.innerHTML = "暂无赛后复盘历史。";
+      return false;
+    }
+
+    box.innerHTML = arr.map(renderReviewCard).join("");
+    return false;
+  };
+
+  window.jaxRenderReviewHistory = window.jaxRenderReviewLoopHistory;
+
+  window.jaxClearReviewLoopHistory = function(){
+    if(confirm("确定清空赛后复盘历史？")){
+      REVIEW_KEYS.forEach(k=>localStorage.removeItem(k));
+      window.jaxRenderReviewLoopHistory();
+    }
+    return false;
+  };
+
+  window.jaxClearReviewHistory = window.jaxClearReviewLoopHistory;
+
+  function bindReviewButtons(){
+    Array.from(document.querySelectorAll("button")).forEach(btn=>{
+      const t = (btn.innerText || "").trim();
+      if(t.includes("保存当前复盘记录") || t.includes("保存到赛后复盘历史")){
+        btn.type = "button";
+        btn.onclick = window.jaxSaveReviewLoopHistory;
+      }
+      if(t.includes("查看复盘历史")){
+        btn.type = "button";
+        btn.onclick = window.jaxRenderReviewLoopHistory;
+      }
+      if(t.includes("清空复盘历史")){
+        btn.type = "button";
+        btn.onclick = window.jaxClearReviewLoopHistory;
+      }
+    });
+  }
+
+  window.addEventListener("DOMContentLoaded", function(){
+    bindReviewButtons();
+    window.jaxRenderReviewLoopHistory();
   });
 })();
 
