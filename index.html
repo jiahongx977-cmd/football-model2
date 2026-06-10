@@ -147,7 +147,7 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
 </head>
 <body>
 <header><h1>JAX的AI模型</h1>
-<p>联网赔率 + 天气/战意/教练/阵容/体能/裁判因素 + 动态比分推演 + Dutching + 滚球对冲OCR + 赛后复盘｜V6.8</p>
+<p>联网赔率 + 天气/战意/教练/阵容/体能/裁判因素 + 动态比分推演 + Dutching + 滚球对冲OCR + 赛后复盘｜V6.9</p>
 </header>
 <div class="notice">
   使用说明：API Key 仍然只放在 Vercel 环境变量 <b>THE_ODDS_API_KEY</b> 中，朋友打开网站不需要自己填 Key。
@@ -771,7 +771,7 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
       </div>
 </section>
 </main>
-<footer>JAX的AI模型｜V6.8 动态比分推演修正版｜赔率与多因素真实推演比分池，Dutching按钮顺序优化。</footer>
+<footer>JAX的AI模型｜V6.9 操作流程与盘口中文解释优化版｜首页流程更清晰，近期比赛滚动显示，盘口英文增加中文解释。</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js">
 function previewDutchImage(e){
@@ -9016,6 +9016,357 @@ document.addEventListener("DOMContentLoaded", function(){
   setTimeout(bindButtons68,2000);
 })();
 
+</script>
+
+
+<style>
+/* V6.9 首页流程优化 */
+#online > .grid{display:block !important}
+#online > .grid > .card{width:100%;margin-bottom:18px}
+#matchList.v69MatchList{max-height:360px;overflow-y:auto;padding-right:8px}
+#matchList.v69MatchList .matchItem{line-height:1.45}
+.v69-flow-tip{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:14px;padding:12px 14px;margin:12px 0;font-size:14px;line-height:1.65}
+.v69-flow-tip b{color:#7c2d12}
+.btn.v69-red-action{background:#dc2626 !important;color:white !important;border-color:#dc2626 !important;font-size:16px !important;font-weight:900 !important;padding:13px 20px !important;border-radius:16px !important;box-shadow:0 8px 18px rgba(220,38,38,.18)}
+.btn.v69-red-action:hover{filter:brightness(.96)}
+.v69-cn{display:block;color:#64748b;font-size:13px;margin-top:3px}
+.v69-api-explain{color:#475569;font-size:12px;line-height:1.5}
+.v69-odds-help{background:#f8fafc;border:1px dashed #cbd5e1;border-radius:12px;padding:10px;margin:10px 0;font-size:12.5px;line-height:1.7;color:#334155}
+</style>
+<script>
+
+/* V6.9 flow UI + Chinese odds explanation
+   1. 首页改为：联网设置在上，近期比赛在下。
+   2. 近期比赛固定高度滚动，不撑长页面。
+   3. 近期比赛英文队名增加中文翻译。
+   4. API赔率按钮顺序：把API赔率带入模型 → 刷新赔率明细；关键按钮放大红色。
+   5. 完整模型分析按钮放大红色。
+   6. API赔率明细增加 Over/Under、Spreads、H2H 中文解释。
+*/
+(function(){
+  function el(id){ return document.getElementById(id); }
+  function safeText(s){ return String(s==null?"":s); }
+  function fmt(n){ n=Number(n); return isFinite(n)?n.toFixed(2):"-"; }
+  function pct(n){ n=Number(n); return isFinite(n)?n.toFixed(1)+"%":"-"; }
+  function avg(arr){ arr=(arr||[]).filter(x=>isFinite(x)); return arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:NaN; }
+
+  const TEAM_CN = {
+    "Mexico":"墨西哥","South Africa":"南非","South Korea":"韩国","Czech Republic":"捷克","Canada":"加拿大",
+    "Bosnia & Herzegovina":"波黑","USA":"美国","United States":"美国","Paraguay":"巴拉圭","Qatar":"卡塔尔",
+    "Switzerland":"瑞士","Brazil":"巴西","Morocco":"摩洛哥","Haiti":"海地","Scotland":"苏格兰",
+    "Australia":"澳大利亚","Turkey":"土耳其","Germany":"德国","Curaçao":"库拉索","Curacao":"库拉索",
+    "Belgium":"比利时","Iran":"伊朗","France":"法国","Spain":"西班牙","England":"英格兰",
+    "Portugal":"葡萄牙","Argentina":"阿根廷","Netherlands":"荷兰","Norway":"挪威","Japan":"日本",
+    "Italy":"意大利","Uruguay":"乌拉圭","Colombia":"哥伦比亚","Croatia":"克罗地亚","Denmark":"丹麦",
+    "Poland":"波兰","Serbia":"塞尔维亚","Sweden":"瑞典","Austria":"奥地利","Chile":"智利",
+    "Peru":"秘鲁","Ecuador":"厄瓜多尔","Venezuela":"委内瑞拉","Bolivia":"玻利维亚",
+    "China":"中国","Saudi Arabia":"沙特阿拉伯","Iraq":"伊拉克","UAE":"阿联酋","United Arab Emirates":"阿联酋",
+    "Egypt":"埃及","Algeria":"阿尔及利亚","Tunisia":"突尼斯","Senegal":"塞内加尔","Nigeria":"尼日利亚",
+    "Ghana":"加纳","Cameroon":"喀麦隆","Ivory Coast":"科特迪瓦","Côte d'Ivoire":"科特迪瓦",
+    "New Zealand":"新西兰","Costa Rica":"哥斯达黎加","Panama":"巴拿马","Jamaica":"牙买加",
+    "Wales":"威尔士","Ireland":"爱尔兰","Northern Ireland":"北爱尔兰","Greece":"希腊",
+    "Ukraine":"乌克兰","Romania":"罗马尼亚","Hungary":"匈牙利","Slovakia":"斯洛伐克",
+    "Slovenia":"斯洛文尼亚","Finland":"芬兰","Congo DR":"刚果（金）","DR Congo":"刚果（金）"
+  };
+  function cnTeam(name){
+    name=safeText(name).trim();
+    return TEAM_CN[name] || name
+      .replace("Czech Republic","捷克")
+      .replace("Bosnia and Herzegovina","波黑");
+  }
+  function matchCn(ev){
+    if(!ev) return "";
+    if(ev.home_team && ev.away_team){
+      const h=cnTeam(ev.home_team), a=cnTeam(ev.away_team);
+      if(h===ev.home_team && a===ev.away_team) return "";
+      return h + " vs " + a;
+    }
+    return "";
+  }
+  function isOutright(ev){
+    try{ if(typeof isOutrightEvent==="function") return isOutrightEvent(ev); }catch(e){}
+    return !ev || !(ev.home_team && ev.away_team);
+  }
+  function selectedEventSafe(){
+    try{ if(typeof selectedEvent!=="undefined" && selectedEvent) return selectedEvent; }catch(e){}
+    return window.selectedEvent || null;
+  }
+  function eventsSafe(){
+    try{ if(typeof eventsCache!=="undefined" && eventsCache) return eventsCache; }catch(e){}
+    return window.eventsCache || [];
+  }
+
+  function applyFlowLayout(){
+    const online=el("online");
+    if(!online) return;
+    const topGrid=online.querySelector(":scope > .grid");
+    if(topGrid) topGrid.classList.add("v69OnlineFlowGrid");
+
+    const firstCard=topGrid ? topGrid.querySelector(".card") : online.querySelector(".card");
+    if(firstCard && !el("v69FlowTip")){
+      const tip=document.createElement("div");
+      tip.id="v69FlowTip";
+      tip.className="v69-flow-tip";
+      tip.innerHTML="<b>操作流程：</b>① 获取近期比赛 → ② 在下方选择比赛 → ③ 点击红色按钮“把API赔率带入模型” → ④ 点击红色按钮“开始完整模型分析”。";
+      const h2=firstCard.querySelector("h2");
+      if(h2 && h2.nextSibling) firstCard.insertBefore(tip, h2.nextSibling);
+      else firstCard.insertBefore(tip, firstCard.firstChild);
+    }
+
+    const ml=el("matchList");
+    if(ml) ml.classList.add("v69MatchList");
+
+    // API按钮顺序和样式
+    const apiBox=document.querySelector(".apiOddsBox");
+    if(apiBox){
+      const flex=apiBox.querySelector(".flex");
+      if(flex){
+        const buttons=Array.from(flex.querySelectorAll("button"));
+        const importBtn=buttons.find(b=>(b.innerText||"").includes("把API"));
+        const refreshBtn=buttons.find(b=>(b.innerText||"").includes("刷新"));
+        if(importBtn){
+          importBtn.innerText="把API赔率带入模型";
+          importBtn.classList.remove("green","blue","primary");
+          importBtn.classList.add("v69-red-action");
+        }
+        if(refreshBtn){
+          refreshBtn.innerText="刷新赔率明细";
+          refreshBtn.classList.remove("green");
+          refreshBtn.classList.add("blue");
+        }
+        if(importBtn && refreshBtn && flex.firstElementChild!==importBtn){
+          flex.insertBefore(importBtn, flex.firstChild);
+          flex.insertBefore(refreshBtn, importBtn.nextSibling);
+        }
+      }
+    }
+
+    // 完整模型分析按钮
+    Array.from(document.querySelectorAll("button")).forEach(btn=>{
+      const t=(btn.innerText||"").trim();
+      if(t.includes("按完整模型重新分析") || t.includes("开始完整模型分析")){
+        btn.innerText="开始完整模型分析";
+        btn.classList.remove("primary","blue","green","orange");
+        btn.classList.add("v69-red-action");
+        btn.type="button";
+        btn.onclick=function(e){
+          if(e){e.preventDefault();e.stopPropagation();}
+          if(typeof window.jaxStableAnalyze==="function") return window.jaxStableAnalyze();
+          return false;
+        };
+      }
+    });
+  }
+
+  function renderMatchListV69(){
+    const box=el("matchList");
+    const arr=eventsSafe();
+    if(!box) return false;
+    box.classList.add("v69MatchList");
+    if(!arr.length){ box.innerHTML="暂无比赛。"; return false; }
+    box.innerHTML=arr.map((ev,i)=>{
+      const t=ev.commence_time?new Date(ev.commence_time).toLocaleString():"长期市场";
+      const out=isOutright(ev);
+      const books=(ev.bookmakers||[]).length;
+      let title="";
+      if(out){
+        title="<b>"+(ev.sport_title||"冠军赔率")+"</b>";
+      }else{
+        const cn=matchCn(ev);
+        title="<b>"+ev.home_team+"</b> vs <b>"+ev.away_team+"</b>";
+        if(cn) title += '<span class="v69-cn">'+cn+'</span>';
+      }
+      return '<div class="matchItem" onclick="selectEvent('+i+',this)">'+title+'<br><span class="muted">'+t+'｜'+(out?"冠军/长期赔率":"博彩公司："+books)+'</span></div>';
+    }).join("");
+    return false;
+  }
+
+  function selectEventV69(i,node){
+    const arr=eventsSafe();
+    if(!arr[i]) return false;
+    try{ selectedEvent=arr[i]; }catch(e){ window.selectedEvent=arr[i]; }
+    const ev=arr[i];
+
+    document.querySelectorAll(".matchItem").forEach(x=>x.classList.remove("active"));
+    if(node) node.classList.add("active");
+
+    const selected=el("selectedInfo");
+    if(selected){
+      if(isOutright(ev)){
+        selected.innerHTML='已选择：<b>'+(ev.sport_title||"冠军赔率")+'</b>';
+      }else{
+        const cn=matchCn(ev);
+        selected.innerHTML='已选择：<b>'+ev.home_team+' vs '+ev.away_team+'</b>'+(cn?'<br><b>'+cn+'</b>':'')+'<br><span class="muted">'+new Date(ev.commence_time).toLocaleString()+'</span>';
+      }
+    }
+
+    if(isOutright(ev)){
+      if(typeof renderOutright==="function") renderOutright(ev);
+    }else{
+      // 先刷新赔率中文明细，不立即强制最终分析，避免用户还没带入API就误以为已经完成
+      if(typeof window.jaxRenderApiOddsDetails==="function") window.jaxRenderApiOddsDetails();
+      if(typeof analyzeSelected==="function") analyzeSelected(false);
+    }
+    applyFlowLayout();
+    return false;
+  }
+
+  function collectMarkets(ev){
+    const out={h2h:[],totals:[],spreads:[]};
+    (ev.bookmakers||[]).forEach(b=>(b.markets||[]).forEach(m=>{
+      if(out[m.key]) out[m.key].push({book:b.title, outcomes:m.outcomes||[]});
+    }));
+    return out;
+  }
+  function groupRows(marketRows, keyFn){
+    const map={};
+    marketRows.forEach(mm=>(mm.outcomes||[]).forEach(o=>{
+      const key=keyFn(o);
+      if(!map[key]) map[key]=[];
+      map[key].push({book:mm.book,name:o.name,price:Number(o.price),point:o.point});
+    }));
+    return Object.keys(map).map(k=>{
+      const arr=map[k].filter(x=>x.price>1).sort((a,b)=>b.price-a.price);
+      return {key:k, avg:avg(arr.map(x=>x.price)), best:arr[0]||null, count:arr.length, sample:arr[0]||{}};
+    });
+  }
+  function h2hSummary(ev){
+    const m=collectMarkets(ev).h2h;
+    const ret={home:[],draw:[],away:[]};
+    m.forEach(mm=>(mm.outcomes||[]).forEach(o=>{
+      if(o.name===ev.home_team) ret.home.push({book:mm.book,price:Number(o.price)});
+      else if(String(o.name).toLowerCase()==="draw") ret.draw.push({book:mm.book,price:Number(o.price)});
+      else if(o.name===ev.away_team) ret.away.push({book:mm.book,price:Number(o.price)});
+    }));
+    function best(a){ return a.filter(x=>x.price>1).sort((x,y)=>y.price-x.price)[0]||null; }
+    const avgHome=avg(ret.home.map(x=>x.price)), avgDraw=avg(ret.draw.map(x=>x.price)), avgAway=avg(ret.away.map(x=>x.price));
+    const ih=avgHome>1?1/avgHome:0, id=avgDraw>1?1/avgDraw:0, ia=avgAway>1?1/avgAway:0, sum=ih+id+ia;
+    return {
+      avgHome,avgDraw,avgAway,bestHome:best(ret.home),bestDraw:best(ret.draw),bestAway:best(ret.away),
+      pHome:sum?ih/sum*100:NaN,pDraw:sum?id/sum*100:NaN,pAway:sum?ia/sum*100:NaN,
+      overround:sum?sum*100:NaN
+    };
+  }
+  function totalExplain(key){
+    const m=String(key).match(/(Over|Under)\s*([0-9.]+)/i);
+    if(!m) return "大小球盘口";
+    const line=parseFloat(m[2]);
+    const floor=Math.floor(line);
+    if(/^over/i.test(m[1])) return "大 "+line+"：全场总进球 "+(floor+1)+" 球或以上";
+    return "小 "+line+"：全场总进球 0-"+floor+" 球";
+  }
+  function spreadExplain(key){
+    const m=String(key).match(/^(.+?)\s*([+-]?\d+(?:\.\d+)?)$/);
+    if(!m) return "让球盘 / 受让盘";
+    const team=m[1].trim(), point=parseFloat(m[2]);
+    const cn=cnTeam(team);
+    if(point<0) return cn+" 让 "+Math.abs(point)+" 球";
+    if(point>0) return cn+" 受让 "+Math.abs(point)+" 球";
+    return cn+" 平手盘";
+  }
+  function renderRows(rows,type){
+    if(!rows.length) return '<p class="small">暂无此类盘口。可能该赛事/地区/博彩公司未提供。</p>';
+    return '<table class="apiMiniTable"><thead><tr><th>盘口</th><th>中文解释</th><th>均值</th><th>最高赔率</th><th>公司</th><th>数量</th></tr></thead><tbody>'+
+      rows.slice(0,12).map(r=>{
+        const exp=type==="total"?totalExplain(r.key):spreadExplain(r.key);
+        return '<tr><td>'+r.key+'</td><td class="v69-api-explain">'+exp+'</td><td>'+fmt(r.avg)+'</td><td>'+(r.best?fmt(r.best.price):'-')+'</td><td>'+(r.best?r.best.book:'-')+'</td><td>'+r.count+'</td></tr>';
+      }).join('')+'</tbody></table>';
+  }
+
+  window.jaxRenderApiOddsDetails=function(){
+    const box=el("apiOddsDetails");
+    if(!box) return false;
+    const ev=selectedEventSafe();
+    if(!ev){ box.innerHTML="请先选择一场比赛。"; return false; }
+    if(!ev.bookmakers || !ev.bookmakers.length){ box.innerHTML="这场比赛当前没有返回博彩公司赔率。"; return false; }
+
+    const markets=collectMarkets(ev), h=h2hSummary(ev);
+    const totalRows=groupRows(markets.totals, o=>(o.name||"")+" "+(o.point!=null?o.point:""));
+    const spreadRows=groupRows(markets.spreads, o=>(o.name||"")+" "+(o.point!=null?(Number(o.point)>0?"+":"")+o.point:""));
+
+    const hTable='<table class="apiMiniTable"><thead><tr><th>方向</th><th>中文解释</th><th>均值赔率</th><th>最高赔率</th><th>最高公司</th><th>模型隐含概率</th></tr></thead><tbody>'+
+      '<tr><td>'+ev.home_team+'</td><td class="v69-api-explain">'+cnTeam(ev.home_team)+' 主胜</td><td>'+fmt(h.avgHome)+'</td><td>'+(h.bestHome?fmt(h.bestHome.price):'-')+'</td><td>'+(h.bestHome?h.bestHome.book:'-')+'</td><td>'+pct(h.pHome)+'</td></tr>'+
+      '<tr><td>Draw</td><td class="v69-api-explain">平局</td><td>'+fmt(h.avgDraw)+'</td><td>'+(h.bestDraw?fmt(h.bestDraw.price):'-')+'</td><td>'+(h.bestDraw?h.bestDraw.book:'-')+'</td><td>'+pct(h.pDraw)+'</td></tr>'+
+      '<tr><td>'+ev.away_team+'</td><td class="v69-api-explain">'+cnTeam(ev.away_team)+' 客胜</td><td>'+fmt(h.avgAway)+'</td><td>'+(h.bestAway?fmt(h.bestAway.price):'-')+'</td><td>'+(h.bestAway?h.bestAway.book:'-')+'</td><td>'+pct(h.pAway)+'</td></tr>'+
+      '</tbody></table>';
+
+    const notes=[];
+    if(isFinite(h.overround)) notes.push('胜平负平均返还率/水差估算：'+pct(h.overround)+'，越高说明公司水差越大。');
+    if(h.pHome>50) notes.push('API隐含概率显示主队为明显热门。');
+    else if(h.pAway>50) notes.push('API隐含概率显示客队为明显热门。');
+    else if(h.pDraw>30) notes.push('平局隐含概率偏高，模型应加强防平/低比分保护。');
+
+    box.innerHTML='<div class="v69-odds-help"><b>盘口中文说明：</b>H2H=胜平负；Totals=大小球；Over 2.5=全场3球或以上；Under 2.5=全场0-2球；Spreads=让球盘，负数代表让球，正数代表受让。</div>'+
+      '<div class="apiOddsGrid">'+
+      '<div class="apiOddsCard"><h4>胜平负 H2H（主胜 / 平局 / 客胜）</h4>'+hTable+'</div>'+
+      '<div class="apiOddsCard"><h4>大小球 Totals（全场总进球大 / 小）</h4>'+renderRows(totalRows,"total")+'</div>'+
+      '<div class="apiOddsCard"><h4>让球 Spreads（让球盘 / 受让盘）</h4>'+renderRows(spreadRows,"spread")+'</div>'+
+      '</div><div class="noteBox"><b>赔率读取结论：</b><ul>'+notes.map(x=>'<li>'+x+'</li>').join('')+'<li>足球波胆赔率通常不在此API标准市场中；波胆仍建议截图OCR或手动填写。</li></ul></div>';
+    return false;
+  };
+
+
+  window.jaxImportApiOddsToModel=function(){
+    const ev=selectedEventSafe();
+    if(!ev){ alert("请先选择比赛。"); return false; }
+    const h=h2hSummary(ev);
+    if(!isFinite(h.pHome)||!isFinite(h.pDraw)||!isFinite(h.pAway)){
+      alert("没有可用胜平负赔率。");
+      return false;
+    }
+    const set=(id,v)=>{ const x=el(id); if(x) x.value=v; };
+    set("modelHomeP", h.pHome.toFixed(1));
+    set("modelDrawP", h.pDraw.toFixed(1));
+    set("modelAwayP", h.pAway.toFixed(1));
+
+    const power=el("powerGap");
+    if(power){
+      const max=Math.max(h.pHome,h.pAway), min=Math.min(h.pHome,h.pAway);
+      if(max-min<8) power.value="balanced";
+      else if(max-min<18) power.value="favorite_small";
+      else if(max-min<30) power.value="favorite_big";
+      else power.value="mismatch";
+    }
+    const heat=el("marketHeat");
+    if(heat){
+      if(Math.max(h.pHome,h.pAway)>62) heat.value="hot_fav";
+      else if(h.pDraw>31) heat.value="cold_pull";
+      else heat.value="normal";
+    }
+    window.jaxRenderApiOddsDetails();
+    const box=el("apiOddsDetails");
+    if(box){
+      const msg=document.createElement("div");
+      msg.className="v69-flow-tip";
+      msg.style.marginTop="10px";
+      msg.innerHTML="<b>已带入API赔率：</b>主胜 "+h.pHome.toFixed(1)+"%，平局 "+h.pDraw.toFixed(1)+"%，客胜 "+h.pAway.toFixed(1)+"%。下一步请点击红色按钮“开始完整模型分析”。";
+      box.insertBefore(msg, box.firstChild);
+    }
+    return false;
+  };
+
+  const oldFetch=window.fetchOdds;
+  if(typeof oldFetch==="function" && !window.__v69FetchWrapped){
+    window.__v69FetchWrapped=true;
+    window.fetchOdds=async function(){
+      const r=await oldFetch.apply(this,arguments);
+      setTimeout(function(){ renderMatchListV69(); applyFlowLayout(); },50);
+      return r;
+    };
+  }
+
+  window.renderMatchList=renderMatchListV69;
+  window.selectEvent=selectEventV69;
+
+  function bindV69(){
+    applyFlowLayout();
+    renderMatchListV69();
+  }
+  window.addEventListener("DOMContentLoaded",bindV69);
+  setTimeout(bindV69,300);
+  setTimeout(bindV69,1000);
+  setTimeout(bindV69,2000);
+})();
 </script>
 
 </body>
