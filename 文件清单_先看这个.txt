@@ -1,18 +1,15 @@
-JAX的AI模型 V6.1 赛后复盘历史保存修正版
+JAX的AI模型 V6.2 赛前保存到复盘历史修正版
 
-修复内容：
-1. 修复“保存当前复盘记录”后，点击“查看复盘历史”仍显示为空的问题。
-2. 兼容旧版字段和新版赛前赛后闭环字段：
-   - reviewMatch / reviewScore / reviewBet / reviewResult / reviewNote
-   - reviewLoopSport / reviewLoopMatch / reviewLoopStart / reviewLoopPrematch / reviewLoopScorelines / reviewLoopFinalScore
-3. 复盘历史显示为中文卡片：
-   - 赛事
-   - 比赛
+本版修复：
+1. 联网选比赛页的“保存到赛后复盘”按钮，现在会立即保存一条赛后复盘历史记录。
+2. 这条记录状态为“赛前待复盘”，保存内容包括：
+   - 赛事名称
+   - 比赛名称
    - 开赛时间
-   - 实际比分
-   - 模型判断
-   - 误差类型
    - 赛前AI推理
    - 赛前波胆推荐
-   - 赛后复盘备注
-4. 技术JSON默认收起。
+   - API赔率明细
+   - 模型输入快照
+3. 保存后会自动跳转到“赛后复盘”页，并立即显示历史卡片。
+4. 赛后再填写实际比分、模型判断、误差类型和备注，可以继续保存成“已填写赛后结果”的记录。
+5. 修复过去“保存了但赛后复盘历史为空”的问题。
