@@ -1,6 +1,6 @@
 {
-  "name": "jax-ai-model-v6-5-review-result-fill",
-  "version": "6.5.0",
+  "name": "jax-ai-model-v6-6-review-module-hard-fix",
+  "version": "6.6.0",
   "private": true,
   "type": "module",
   "engines": {

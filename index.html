@@ -128,11 +128,26 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
 .reviewFillBox textarea{min-height:80px}
 .reviewStatusDone{color:#15803d;font-weight:800}
 .reviewStatusPending{color:#c2410c;font-weight:800}
+
+.v66ReviewPanel{background:#fff;border:1px solid var(--line,#e5e7eb);border-radius:16px;padding:16px;margin:14px 0;box-shadow:0 6px 20px rgba(15,23,42,.05)}
+.v66ReviewCard{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin:12px 0}
+.v66ReviewCard summary{cursor:pointer;font-weight:800;line-height:1.6}
+.v66Meta{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.v66Meta span{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:4px 10px;font-size:12px;color:#334155}
+.v66TextBox{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px;margin-top:10px;white-space:pre-wrap;line-height:1.65}
+.v66FillBox{margin-top:12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:12px}
+.v66FillGrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.v66FillBox label{font-size:12px;font-weight:800;color:#334155;display:block;margin:6px 0}
+.v66FillBox input,.v66FillBox select,.v66FillBox textarea{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:8px}
+.v66FillBox textarea{min-height:78px}
+.v66Done{color:#15803d;font-weight:900}
+.v66Pending{color:#c2410c;font-weight:900}
+.v66Tech{background:#0f172a;color:#dbeafe;border-radius:10px;padding:10px;margin-top:10px;font-size:12px;white-space:pre-wrap;max-height:320px;overflow:auto}
 </style>
 </head>
 <body>
 <header><h1>JAX的AI模型</h1>
-<p>联网赔率 + 天气/战意/教练/阵容/体能/裁判因素 + 模型比分池 + Dutching + 滚球对冲OCR + 赛后复盘｜V6.5</p>
+<p>联网赔率 + 天气/战意/教练/阵容/体能/裁判因素 + 模型比分池 + Dutching + 滚球对冲OCR + 赛后复盘｜V6.6</p>
 </header>
 <div class="notice">
   使用说明：API Key 仍然只放在 Vercel 环境变量 <b>THE_ODDS_API_KEY</b> 中，朋友打开网站不需要自己填 Key。
@@ -756,7 +771,7 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
       </div>
 </section>
 </main>
-<footer>JAX的AI模型｜V6.5 复盘补比分修正版｜每条复盘记录可填写实际比分、误差原因并更新保存。</footer>
+<footer>JAX的AI模型｜V6.6 复盘模块彻底修正版｜复盘记录去重、可补实际比分、保存/查看/清空全部生效。</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js">
 function previewDutchImage(e){
@@ -7948,6 +7963,547 @@ document.addEventListener("DOMContentLoaded", function(){
   window.addEventListener("DOMContentLoaded", boot);
   setTimeout(boot, 300);
   setTimeout(boot, 1000);
+})();
+
+</script>
+<script>
+
+/* V6.6 review module hard fix
+   彻底接管赛后复盘模块：
+   1. 保存到赛后复盘：只新增一条赛前待复盘记录，不重复刷屏。
+   2. 每条记录内可填写实际比分、模型判断、误差类型、复盘备注。
+   3. 保存当前复盘记录、查看复盘历史、清空复盘历史全部强制生效。
+   4. 清空会清掉所有旧版本复盘key。
+*/
+(function(){
+  const KEY = "jax_review_history_v66";
+  const ALL_REVIEW_KEYS = [
+    KEY,
+    "jax_review_history_v65",
+    "jax_review_history_v64",
+    "jax_review_history_v63",
+    "jax_review_history_v62",
+    "jax_review_history_v61",
+    "jax_review_history_v57",
+    "jax_review_history_v58",
+    "jax_review_history_v54",
+    "jax_review_history_v51"
+  ];
+
+  function el(id){ return document.getElementById(id); }
+  function val(id){
+    const x = el(id);
+    if(!x) return "";
+    return (x.value || x.innerText || "").trim();
+  }
+  function setVal(id, v){
+    const x = el(id);
+    if(!x) return false;
+    if("value" in x) x.value = v || "";
+    else x.innerText = v || "";
+    return true;
+  }
+  function esc(s){
+    return String(s === undefined || s === null || s === "" ? "" : s)
+      .replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+  function now(){ return new Date().toLocaleString(); }
+
+  function optionHtml(list, selected){
+    return list.map(o=>`<option ${o===selected ? "selected" : ""}>${esc(o)}</option>`).join("");
+  }
+
+  function activeSportName(){
+    const s = el("sportSelect") || el("sport") || Array.from(document.querySelectorAll("select")).find(x=>(x.value||"").includes("soccer_"));
+    if(s && s.options && s.selectedIndex >= 0) return s.options[s.selectedIndex].text || s.value || "";
+    return "未识别赛事";
+  }
+
+  function currentMatchInfo(){
+    let name = "", start = "";
+    if(window.selectedMatch){
+      if(window.selectedMatch.home_team && window.selectedMatch.away_team){
+        name = window.selectedMatch.home_team + " vs " + window.selectedMatch.away_team;
+      }else{
+        name = window.selectedMatch.title || window.selectedMatch.name || "";
+      }
+      start = window.selectedMatch.commence_time || window.selectedMatch.time || "";
+    }
+
+    const text = document.body.innerText || "";
+    if(!name){
+      const m = text.match(/已选择：\s*([^\n]+)/);
+      if(m && m[1]) name = m[1].trim();
+    }
+    if(!start){
+      const t = text.match(/已选择：\s*[^\n]+\n\s*([0-9]{4}[\/\-][0-9]{1,2}[\/\-][0-9]{1,2}[^\n]*)/);
+      if(t && t[1]) start = t[1].trim();
+    }
+
+    return {
+      sport: activeSportName(),
+      match: name || "未选择比赛",
+      startTime: start || "未识别开赛时间"
+    };
+  }
+
+  function getAnalysisText(){
+    const box = el("analysisResult");
+    if(box && box.innerText.trim()) return box.innerText.trim();
+
+    const cards = Array.from(document.querySelectorAll(".card,.result-box,section"));
+    const c = cards.find(x => (x.innerText || "").includes("完整模型分析结果"));
+    if(c) return (c.innerText || "").trim().slice(0, 5000);
+
+    return "未找到赛前AI分析结果。请先选择比赛并点击“按完整模型重新分析”。";
+  }
+
+  function getScorelineText(){
+    const table = el("modelScoreTable");
+    if(table && table.innerText.trim()) return table.innerText.trim();
+
+    const tables = Array.from(document.querySelectorAll("table"));
+    const t = tables.find(x=>{
+      const tx = x.innerText || "";
+      return tx.includes("波胆") || tx.includes("模型权重") || tx.includes("剧本");
+    });
+    return t ? t.innerText.trim() : "未找到赛前波胆推荐。";
+  }
+
+  function getApiOddsText(){
+    const box = el("apiOddsDetail") || el("apiOddsResult") || document.querySelector(".apiOddsBox");
+    return box && box.innerText.trim() ? box.innerText.trim() : "";
+  }
+
+  function modelInputSnapshot(){
+    const ids = [
+      "weatherCity","matchNature","teamRelation","marketHeat",
+      "weatherImpact","coachIntent","lineupStatus","scheduleFatigue",
+      "refStyle","refRelation","cardRisk","varRisk",
+      "trueHomeProb","trueDrawProb","trueAwayProb","stakeBudget"
+    ];
+    const obj = {};
+    ids.forEach(id=>{
+      const x = el(id);
+      if(x) obj[id] = x.value || x.innerText || "";
+    });
+    return obj;
+  }
+
+  function cleanRecord(x){
+    const r = Object.assign({}, x || {});
+    r.module = r.module || "赛后复盘";
+    r.status = r.status || "赛前待复盘";
+    r.sport = r.sport || "未识别赛事";
+    r.match = r.match || r.reviewMatch || r.noteMatch || "未选择比赛";
+    r.startTime = r.startTime || "未识别开赛时间";
+    r.savedAt = r.savedAt || r.time || now();
+    r.prematchAnalysis = r.prematchAnalysis || r.reviewBet || "";
+    r.scorelineRecommendation = r.scorelineRecommendation || "";
+    r.finalScore = r.finalScore || r.reviewScore || "";
+    r.hitResult = r.hitResult || r.reviewResult || "待赛后填写";
+    r.errorType = r.errorType || "待赛后填写";
+    r.reviewNote = r.reviewNote || r.noteText || "";
+    r._rid = r._rid || ("r_" + Math.random().toString(16).slice(2) + "_" + Date.now());
+    return r;
+  }
+
+  function readRecords(){
+    let arr = [];
+    ALL_REVIEW_KEYS.forEach(k=>{
+      try{
+        const a = JSON.parse(localStorage.getItem(k) || "[]");
+        if(Array.isArray(a)) arr = arr.concat(a);
+      }catch(e){}
+    });
+
+    arr = arr.map(cleanRecord);
+
+    // 去重：同一比赛 + 同一保存时间附近 + 同状态，只留一条
+    const seen = new Set();
+    const out = [];
+    arr.forEach(x=>{
+      const key = [
+        x.match,
+        x.startTime,
+        x.savedAt,
+        x.finalScore || "",
+        x.status || ""
+      ].join("|");
+      if(!seen.has(key)){
+        seen.add(key);
+        out.push(x);
+      }
+    });
+
+    return out;
+  }
+
+  function writeRecords(arr){
+    const cleaned = arr.map(cleanRecord).slice(0, 300);
+    localStorage.setItem(KEY, JSON.stringify(cleaned));
+    // 关键：迁移后清理旧key，避免旧记录反复回来
+    ALL_REVIEW_KEYS.filter(k=>k!==KEY).forEach(k=>localStorage.removeItem(k));
+  }
+
+  function buildPrematchRecord(){
+    const info = currentMatchInfo();
+    return cleanRecord({
+      module: "赛后复盘",
+      status: "赛前待复盘",
+      sport: info.sport,
+      match: info.match,
+      startTime: info.startTime,
+      savedAt: now(),
+      prematchAnalysis: getAnalysisText(),
+      scorelineRecommendation: getScorelineText(),
+      apiOddsDetail: getApiOddsText(),
+      modelInputs: modelInputSnapshot(),
+      finalScore: "",
+      hitResult: "待赛后填写",
+      errorType: "待赛后填写",
+      reviewNote: "从联网选比赛页保存的赛前分析。赛后补实际比分、误差类型和备注。",
+      version: "V6.6"
+    });
+  }
+
+  function findReviewSection(){
+    return el("review") || Array.from(document.querySelectorAll("section,.tab")).find(x=>(x.innerText||"").includes("赛后复盘"));
+  }
+
+  function ensureReviewPanel(){
+    const review = findReviewSection();
+    if(!review) return null;
+
+    // 隐藏旧历史盒，避免两个历史显示冲突
+    Array.from(review.querySelectorAll(".result-box")).forEach(box=>{
+      if(box.id !== "v66ReviewHistoryBox" && (box.innerText||"").includes("复盘")){
+        box.style.display = "none";
+      }
+    });
+
+    let panel = el("v66ReviewPanel");
+    if(panel) return panel;
+
+    panel = document.createElement("div");
+    panel.id = "v66ReviewPanel";
+    panel.className = "v66ReviewPanel";
+    panel.innerHTML = `
+      <h2>赛后复盘历史记录</h2>
+      <p class="small">从“联网选比赛”保存过来的记录会显示在这里。比赛结束后，在每条记录里补实际比分和误差原因。</p>
+
+      <label>本次复盘备注，可空</label>
+      <input id="v66ReviewGeneralNote" placeholder="如：赛后发现裁判漏判 / 天气估计错误 / 盘口反跳没处理" />
+
+      <div class="flex" style="margin-top:10px">
+        <button class="btn green" type="button" id="v66SaveManualReview">保存当前复盘记录</button>
+        <button class="btn blue" type="button" id="v66ViewReviewHistory">查看复盘历史</button>
+        <button class="btn red" type="button" id="v66ClearReviewHistory">清空复盘历史</button>
+      </div>
+
+      <div id="v66ReviewHistoryBox" class="result-box">暂无赛后复盘历史。</div>
+    `;
+
+    // 放到赛后复盘页最前面，更好找
+    const firstCard = review.querySelector(".card");
+    if(firstCard) firstCard.parentNode.insertBefore(panel, firstCard);
+    else review.insertBefore(panel, review.firstChild);
+
+    panel.querySelector("#v66SaveManualReview").onclick = saveManualReview;
+    panel.querySelector("#v66ViewReviewHistory").onclick = renderHistory;
+    panel.querySelector("#v66ClearReviewHistory").onclick = clearHistory;
+
+    return panel;
+  }
+
+  function renderCard(x, i){
+    const done = (x.status || "").includes("已填写");
+    const hitOptions = ["待赛后填写","命中主线","命中保护","方向对但比分偏差","只对大小球/方向","完全失误"];
+    const errorOptions = ["待赛后填写","无明显误差","裁判/VAR","天气/场地","阵容/伤停","教练/战意","盘口异常","体能/赛程","临场事件","数据/API缺失","其他"];
+
+    return `
+      <div class="v66ReviewCard">
+        <details open>
+          <summary>
+            ${esc(x.sport)}｜${esc(x.match)}｜${esc(x.startTime)}<br>
+            <span class="small">保存：${esc(x.savedAt)}｜状态：<span class="${done ? "v66Done" : "v66Pending"}">${esc(x.status)}</span>｜实际比分：${esc(x.finalScore || "待填写")}</span>
+          </summary>
+
+          <div class="v66Meta">
+            <span>模块：赛后复盘</span>
+            <span>版本：${esc(x.version || "-")}</span>
+            <span>模型判断：${esc(x.hitResult)}</span>
+            <span>误差：${esc(x.errorType)}</span>
+          </div>
+
+          <div class="v66FillBox">
+            <h4>补充赛后结果</h4>
+            <div class="v66FillGrid">
+              <div>
+                <label>实际比分</label>
+                <input id="v66Final_${i}" placeholder="如 1-1 / 2-0" value="${esc(x.finalScore || "")}" />
+              </div>
+              <div>
+                <label>模型判断结果</label>
+                <select id="v66Hit_${i}">
+                  ${optionHtml(hitOptions, x.hitResult || "待赛后填写")}
+                </select>
+              </div>
+              <div>
+                <label>误差类型</label>
+                <select id="v66Error_${i}">
+                  ${optionHtml(errorOptions, x.errorType || "待赛后填写")}
+                </select>
+              </div>
+            </div>
+
+            <label>赛后复盘备注 / 后续修正建议</label>
+            <textarea id="v66Note_${i}" placeholder="例如：模型低估天气影响；裁判尺度导致比分偏大；盘口反跳没处理。">${esc(x.reviewNote || "")}</textarea>
+
+            <div class="flex" style="margin-top:8px">
+              <button class="btn green" type="button" onclick="jaxV66UpdateReview(${i})">保存赛后结果</button>
+              <button class="btn orange" type="button" onclick="jaxV66CopyToFeedback(${i})">写入模型反馈</button>
+              <button class="btn red" type="button" onclick="jaxV66DeleteReview(${i})">删除这条</button>
+            </div>
+          </div>
+
+          <div class="v66TextBox"><b>赛前AI推理：</b>\n${esc(x.prematchAnalysis || "-")}</div>
+          <div class="v66TextBox"><b>赛前波胆推荐：</b>\n${esc(x.scorelineRecommendation || "-")}</div>
+          ${x.apiOddsDetail ? `<div class="v66TextBox"><b>API赔率明细：</b>\n${esc(x.apiOddsDetail)}</div>` : ""}
+
+          <details style="margin-top:10px">
+            <summary>技术详情 JSON</summary>
+            <pre class="v66Tech">${esc(JSON.stringify(x,null,2))}</pre>
+          </details>
+        </details>
+      </div>
+    `;
+  }
+
+  function renderHistory(){
+    ensureReviewPanel();
+    const box = el("v66ReviewHistoryBox") || el("reviewHistoryList") || el("reviewLoopHistoryList");
+    if(!box) return false;
+
+    const arr = readRecords();
+    writeRecords(arr); // 顺手迁移清理旧key
+
+    if(!arr.length){
+      box.innerHTML = "暂无赛后复盘历史。";
+      return false;
+    }
+
+    box.innerHTML = arr.map(renderCard).join("");
+    return false;
+  }
+
+  function savePrematchToReview(){
+    const arr = readRecords();
+    const record = buildPrematchRecord();
+
+    // 避免连续点击同一个比赛生成一堆一样：同场同开赛时间的“赛前待复盘”只保留最近一条
+    const filtered = arr.filter(x => !(x.match === record.match && x.startTime === record.startTime && x.status === "赛前待复盘"));
+    filtered.unshift(record);
+    writeRecords(filtered);
+
+    // 同步填旧/新字段，万一用户还用旧区域也能保留
+    setVal("reviewLoopSport", record.sport);
+    setVal("reviewLoopMatch", record.match);
+    setVal("reviewLoopStart", record.startTime);
+    setVal("reviewLoopPrematch", record.prematchAnalysis);
+    setVal("reviewLoopScorelines", record.scorelineRecommendation);
+    setVal("reviewMatch", record.match);
+    setVal("reviewBet", record.prematchAnalysis);
+    setVal("noteMatch", record.match);
+
+    if(typeof showTab === "function"){
+      const btn = Array.from(document.querySelectorAll(".tabs button")).find(b=>(b.innerText||"").includes("赛后复盘"));
+      showTab("review", btn || null);
+    }else{
+      document.querySelectorAll(".tab").forEach(s=>s.classList.add("hidden"));
+      findReviewSection()?.classList.remove("hidden");
+    }
+
+    setTimeout(()=>{
+      renderHistory();
+      const box = el("v66ReviewPanel") || el("v66ReviewHistoryBox");
+      if(box) box.scrollIntoView({behavior:"smooth", block:"start"});
+    }, 60);
+
+    return false;
+  }
+
+  function saveManualReview(){
+    const info = currentMatchInfo();
+    const arr = readRecords();
+    const record = cleanRecord({
+      module: "赛后复盘",
+      status: "已填写赛后结果",
+      sport: val("reviewLoopSport") || info.sport,
+      match: val("reviewLoopMatch") || val("reviewMatch") || info.match,
+      startTime: val("reviewLoopStart") || info.startTime,
+      savedAt: now(),
+      prematchAnalysis: val("reviewLoopPrematch") || val("reviewBet") || getAnalysisText(),
+      scorelineRecommendation: val("reviewLoopScorelines") || getScorelineText(),
+      apiOddsDetail: getApiOddsText(),
+      finalScore: val("reviewLoopFinalScore") || val("reviewScore") || "",
+      hitResult: val("reviewLoopHit") || val("reviewResult") || "待赛后填写",
+      errorType: val("reviewLoopErrorType") || val("noteType") || "待赛后填写",
+      reviewNote: val("reviewLoopNote") || val("reviewNote") || val("noteText") || val("v66ReviewGeneralNote") || "",
+      modelInputs: modelInputSnapshot(),
+      version: "V6.6"
+    });
+    arr.unshift(record);
+    writeRecords(arr);
+    renderHistory();
+    return false;
+  }
+
+  function clearHistory(){
+    if(confirm("确定清空所有赛后复盘历史？")){
+      ALL_REVIEW_KEYS.forEach(k=>localStorage.removeItem(k));
+      renderHistory();
+    }
+    return false;
+  }
+
+  window.jaxV66UpdateReview = function(index){
+    const arr = readRecords();
+    const r = arr[index];
+    if(!r){
+      alert("没有找到这条记录。");
+      return false;
+    }
+    r.finalScore = val("v66Final_" + index);
+    r.hitResult = val("v66Hit_" + index);
+    r.errorType = val("v66Error_" + index);
+    r.reviewNote = val("v66Note_" + index);
+    r.status = "已填写赛后结果";
+    r.updatedAt = now();
+    r.version = "V6.6";
+    writeRecords(arr);
+    renderHistory();
+    alert("已保存赛后结果。");
+    return false;
+  };
+
+  window.jaxV66DeleteReview = function(index){
+    if(!confirm("确定删除这条复盘记录？")) return false;
+    const arr = readRecords();
+    arr.splice(index, 1);
+    writeRecords(arr);
+    renderHistory();
+    return false;
+  };
+
+  window.jaxV66CopyToFeedback = function(index){
+    const arr = readRecords();
+    const r = arr[index];
+    if(!r) return false;
+
+    if(typeof showTab === "function"){
+      const btn = Array.from(document.querySelectorAll(".tabs button")).find(b=>(b.innerText||"").includes("模型反馈"));
+      showTab("omission", btn || null);
+    }
+
+    setVal("feedbackMatch", r.match || "");
+    setVal("feedbackType", "赛后复盘修正");
+    setVal("feedbackText",
+      "比赛：" + (r.match || "") +
+      "\\n实际比分：" + (r.finalScore || "") +
+      "\\n模型判断：" + (r.hitResult || "") +
+      "\\n误差类型：" + (r.errorType || "") +
+      "\\n复盘备注：" + (r.reviewNote || "")
+    );
+    return false;
+  };
+
+  // 对外覆盖所有旧函数
+  window.jaxSavePrematchToReviewHistory = savePrematchToReview;
+  window.jaxCopyPrematchToReview = savePrematchToReview;
+  window.jaxRenderReviewHistory = renderHistory;
+  window.jaxRenderReviewLoopHistory = renderHistory;
+  window.jaxClearReviewHistory = clearHistory;
+  window.jaxClearReviewLoopHistory = clearHistory;
+  window.jaxSaveReviewHistory = saveManualReview;
+  window.jaxSaveReviewLoopHistory = saveManualReview;
+
+  function bindButtons(){
+    ensureReviewPanel();
+
+    document.querySelectorAll("button").forEach(btn=>{
+      const t = (btn.innerText || "").trim();
+
+      if(t.includes("保存到赛后复盘")){
+        btn.type = "button";
+        btn.onclick = savePrematchToReview;
+      }
+
+      if(t.includes("保存当前复盘记录")){
+        btn.type = "button";
+        btn.onclick = saveManualReview;
+      }
+
+      if(t.includes("查看复盘历史")){
+        btn.type = "button";
+        btn.onclick = renderHistory;
+      }
+
+      if(t.includes("清空复盘历史")){
+        btn.type = "button";
+        btn.onclick = clearHistory;
+      }
+    });
+  }
+
+  // 捕获点击，防止旧脚本覆盖
+  document.addEventListener("click", function(e){
+    const btn = e.target && e.target.closest ? e.target.closest("button") : null;
+    if(!btn) return;
+    const t = (btn.innerText || "").trim();
+
+    if(t.includes("保存到赛后复盘")){
+      e.preventDefault();
+      e.stopPropagation();
+      if(e.stopImmediatePropagation) e.stopImmediatePropagation();
+      savePrematchToReview();
+      return false;
+    }
+
+    if(t.includes("保存当前复盘记录")){
+      e.preventDefault();
+      e.stopPropagation();
+      if(e.stopImmediatePropagation) e.stopImmediatePropagation();
+      saveManualReview();
+      return false;
+    }
+
+    if(t.includes("清空复盘历史")){
+      e.preventDefault();
+      e.stopPropagation();
+      if(e.stopImmediatePropagation) e.stopImmediatePropagation();
+      clearHistory();
+      return false;
+    }
+
+    if(t.includes("查看复盘历史")){
+      e.preventDefault();
+      e.stopPropagation();
+      if(e.stopImmediatePropagation) e.stopImmediatePropagation();
+      renderHistory();
+      return false;
+    }
+  }, true);
+
+  function boot(){
+    bindButtons();
+    renderHistory();
+  }
+
+  window.addEventListener("DOMContentLoaded", boot);
+  setTimeout(boot, 300);
+  setTimeout(boot, 1000);
+  setTimeout(boot, 1800);
 })();
 
 </script>
