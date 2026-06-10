@@ -123,7 +123,7 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
 </head>
 <body>
 <header><h1>JAX的AI模型</h1>
-<p>联网赔率 + 天气/战意/教练/阵容/体能/裁判因素 + 模型比分池 + Dutching + 滚球对冲OCR + 赛后复盘｜V6.3</p>
+<p>联网赔率 + 天气/战意/教练/阵容/体能/裁判因素 + 模型比分池 + Dutching + 滚球对冲OCR + 赛后复盘｜V6.4</p>
 </header>
 <div class="notice">
   使用说明：API Key 仍然只放在 Vercel 环境变量 <b>THE_ODDS_API_KEY</b> 中，朋友打开网站不需要自己填 Key。
@@ -747,7 +747,7 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
       </div>
 </section>
 </main>
-<footer>JAX的AI模型｜V6.3 强制保存复盘历史版｜看到这个版本号才代表已更新成功。</footer>
+<footer>JAX的AI模型｜V6.4 复盘保存事件拦截版｜保存到赛后复盘会强制写入历史记录。</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js">
 function previewDutchImage(e){
@@ -7243,6 +7243,312 @@ document.addEventListener("DOMContentLoaded", function(){
   window.addEventListener("DOMContentLoaded", boot);
   setTimeout(boot, 300);
   setTimeout(boot, 1000);
+})();
+
+</script>
+<script>
+
+/* V6.4 review save event capture
+   关键修复：
+   不再依赖原按钮 onclick。
+   document 捕获阶段拦截所有“保存到赛后复盘”点击，先写 localStorage，再跳转并渲染。
+*/
+(function(){
+  const KEY = "jax_review_history_v64";
+  const LEGACY_KEYS = [
+    "jax_review_history_v63",
+    "jax_review_history_v62",
+    "jax_review_history_v61",
+    "jax_review_history_v57",
+    "jax_review_history_v58",
+    "jax_review_history_v54",
+    "jax_review_history_v51"
+  ];
+
+  function el(id){ return document.getElementById(id); }
+  function val(id){
+    const x = el(id);
+    if(!x) return "";
+    return (x.value || x.innerText || "").trim();
+  }
+  function setVal(id, v){
+    const x = el(id);
+    if(!x) return false;
+    if("value" in x) x.value = v || "";
+    else x.innerText = v || "";
+    return true;
+  }
+  function esc(s){
+    return String(s === undefined || s === null || s === "" ? "-" : s)
+      .replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  function activeSportName(){
+    const s = el("sportSelect") || el("sport") || Array.from(document.querySelectorAll("select")).find(x=>(x.value||"").includes("soccer_"));
+    if(s && s.options && s.selectedIndex >= 0) return s.options[s.selectedIndex].text || s.value || "";
+    return "未识别赛事";
+  }
+
+  function currentMatchInfo(){
+    let name = "", start = "";
+
+    if(window.selectedMatch){
+      if(window.selectedMatch.home_team && window.selectedMatch.away_team){
+        name = window.selectedMatch.home_team + " vs " + window.selectedMatch.away_team;
+      }else{
+        name = window.selectedMatch.title || window.selectedMatch.name || "";
+      }
+      start = window.selectedMatch.commence_time || window.selectedMatch.time || "";
+    }
+
+    const text = document.body.innerText || "";
+    if(!name){
+      const m = text.match(/已选择：\s*([^\n]+)/);
+      if(m && m[1]) name = m[1].trim();
+    }
+    if(!start){
+      const t = text.match(/已选择：\s*[^\n]+\n\s*([0-9]{4}[\/\-][0-9]{1,2}[\/\-][0-9]{1,2}[^\n]*)/);
+      if(t && t[1]) start = t[1].trim();
+    }
+
+    return {
+      sport: activeSportName(),
+      match: name || "未选择比赛",
+      startTime: start || "未识别开赛时间"
+    };
+  }
+
+  function getAnalysisText(){
+    const box = el("analysisResult");
+    if(box && box.innerText.trim()) return box.innerText.trim();
+
+    const cards = Array.from(document.querySelectorAll(".card,.result-box,section"));
+    const c = cards.find(x => (x.innerText || "").includes("完整模型分析结果"));
+    if(c) return (c.innerText || "").trim().slice(0, 5000);
+
+    return "未找到赛前AI分析结果。请先选择比赛并点击“按完整模型重新分析”。";
+  }
+
+  function getScorelineText(){
+    const table = el("modelScoreTable");
+    if(table && table.innerText.trim()) return table.innerText.trim();
+
+    const tables = Array.from(document.querySelectorAll("table"));
+    const t = tables.find(x=>{
+      const tx = x.innerText || "";
+      return tx.includes("波胆") || tx.includes("模型权重") || tx.includes("剧本");
+    });
+    return t ? t.innerText.trim() : "未找到赛前波胆推荐。";
+  }
+
+  function getApiOddsText(){
+    const box = el("apiOddsDetail") || el("apiOddsResult") || document.querySelector(".apiOddsBox");
+    return box && box.innerText.trim() ? box.innerText.trim() : "";
+  }
+
+  function modelInputSnapshot(){
+    const ids = [
+      "weatherCity","matchNature","teamRelation","marketHeat",
+      "weatherImpact","coachIntent","lineupStatus","scheduleFatigue",
+      "refStyle","refRelation","cardRisk","varRisk",
+      "trueHomeProb","trueDrawProb","trueAwayProb","stakeBudget"
+    ];
+    const obj = {};
+    ids.forEach(id=>{
+      const x = el(id);
+      if(x) obj[id] = x.value || x.innerText || "";
+    });
+    return obj;
+  }
+
+  function readRecords(){
+    let arr = [];
+    [KEY].concat(LEGACY_KEYS).forEach(k=>{
+      try{
+        const a = JSON.parse(localStorage.getItem(k) || "[]");
+        if(Array.isArray(a)) arr = arr.concat(a);
+      }catch(e){}
+    });
+
+    const seen = new Set();
+    return arr.filter(x=>{
+      const key = [x.savedAt || x.time || "", x.match || x.reviewMatch || "", x.startTime || "", x.status || ""].join("|");
+      if(seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  function writeRecords(arr){
+    localStorage.setItem(KEY, JSON.stringify(arr.slice(0,300)));
+  }
+
+  function buildPrematchRecord(){
+    const info = currentMatchInfo();
+    return {
+      module: "赛后复盘",
+      status: "赛前待复盘",
+      sport: info.sport,
+      match: info.match,
+      startTime: info.startTime,
+      savedAt: new Date().toLocaleString(),
+      prematchAnalysis: getAnalysisText(),
+      scorelineRecommendation: getScorelineText(),
+      apiOddsDetail: getApiOddsText(),
+      modelInputs: modelInputSnapshot(),
+      finalScore: "",
+      hitResult: "待赛后填写",
+      errorType: "待赛后填写",
+      reviewNote: "从联网选比赛页保存的赛前分析。赛后补实际比分、误差类型和备注。",
+      version: "V6.4"
+    };
+  }
+
+  function ensureHistoryBox(){
+    let box = el("reviewLoopHistoryList") || el("reviewHistoryList");
+    if(box) return box;
+
+    const review = el("review");
+    if(!review) return null;
+
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <h2>赛后复盘历史记录</h2>
+      <p class="small">这里显示从联网选比赛保存过来的赛前待复盘记录，以及赛后补充后的复盘记录。</p>
+      <div class="flex">
+        <button class="btn blue" type="button" onclick="jaxRenderReviewHistory()">查看复盘历史</button>
+        <button class="btn red" type="button" onclick="jaxClearReviewHistory()">清空复盘历史</button>
+      </div>
+      <div id="reviewHistoryList" class="result-box">暂无赛后复盘历史。</div>
+    `;
+    review.appendChild(card);
+    return el("reviewHistoryList");
+  }
+
+  function renderCard(x){
+    return `
+      <div class="friendlyHistoryCard" style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin:12px 0;">
+        <details open>
+          <summary style="cursor:pointer;font-weight:800;">
+            ${esc(x.sport || "未识别赛事")}｜${esc(x.match || "未选择比赛")}｜${esc(x.startTime || "未识别开赛时间")}<br>
+            <span class="small">保存：${esc(x.savedAt || "-")}｜状态：${esc(x.status || "已复盘")}｜实际比分：${esc(x.finalScore || "待填写")}</span>
+          </summary>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;">
+            <span style="background:#f1f5f9;border-radius:999px;padding:4px 10px;font-size:12px;">模块：赛后复盘</span>
+            <span style="background:#f1f5f9;border-radius:999px;padding:4px 10px;font-size:12px;">版本：${esc(x.version || "-")}</span>
+            <span style="background:#f1f5f9;border-radius:999px;padding:4px 10px;font-size:12px;">模型判断：${esc(x.hitResult || "-")}</span>
+            <span style="background:#f1f5f9;border-radius:999px;padding:4px 10px;font-size:12px;">误差：${esc(x.errorType || "-")}</span>
+          </div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px;margin-top:10px;white-space:pre-wrap;"><b>赛前AI推理：</b>\n${esc(x.prematchAnalysis || "-")}</div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px;margin-top:10px;white-space:pre-wrap;"><b>赛前波胆推荐：</b>\n${esc(x.scorelineRecommendation || "-")}</div>
+          ${x.apiOddsDetail ? `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px;margin-top:10px;white-space:pre-wrap;"><b>API赔率明细：</b>\n${esc(x.apiOddsDetail)}</div>` : ""}
+          <details style="margin-top:10px"><summary>技术详情 JSON</summary><pre style="background:#0f172a;color:#dbeafe;border-radius:10px;padding:10px;max-height:300px;overflow:auto;">${esc(JSON.stringify(x,null,2))}</pre></details>
+        </details>
+      </div>
+    `;
+  }
+
+  window.jaxRenderReviewHistory = function(){
+    const box = ensureHistoryBox();
+    if(!box) return false;
+    const arr = readRecords();
+    if(!arr.length){
+      box.innerHTML = "暂无赛后复盘历史。";
+      return false;
+    }
+    box.innerHTML = arr.map(renderCard).join("");
+    return false;
+  };
+  window.jaxRenderReviewLoopHistory = window.jaxRenderReviewHistory;
+
+  window.jaxClearReviewHistory = function(){
+    if(confirm("确定清空赛后复盘历史？")){
+      [KEY].concat(LEGACY_KEYS).forEach(k=>localStorage.removeItem(k));
+      window.jaxRenderReviewHistory();
+    }
+    return false;
+  };
+  window.jaxClearReviewLoopHistory = window.jaxClearReviewHistory;
+
+  window.jaxSavePrematchToReviewHistory = function(){
+    const record = buildPrematchRecord();
+    const arr = readRecords();
+    arr.unshift(record);
+    writeRecords(arr);
+
+    // 同步填复盘字段
+    setVal("reviewLoopSport", record.sport);
+    setVal("reviewLoopMatch", record.match);
+    setVal("reviewLoopStart", record.startTime);
+    setVal("reviewLoopPrematch", record.prematchAnalysis);
+    setVal("reviewLoopScorelines", record.scorelineRecommendation);
+    setVal("reviewMatch", record.match);
+    setVal("reviewBet", record.prematchAnalysis);
+    setVal("noteMatch", record.match);
+
+    if(typeof showTab === "function"){
+      const btn = Array.from(document.querySelectorAll(".tabs button")).find(b=>(b.innerText||"").includes("赛后复盘"));
+      showTab("review", btn || null);
+    }else{
+      document.querySelectorAll(".tab").forEach(s=>s.classList.add("hidden"));
+      el("review")?.classList.remove("hidden");
+    }
+
+    setTimeout(()=>{
+      window.jaxRenderReviewHistory();
+      const box = ensureHistoryBox();
+      if(box) box.scrollIntoView({behavior:"smooth", block:"start"});
+    }, 60);
+
+    return false;
+  };
+
+  window.jaxCopyPrematchToReview = window.jaxSavePrematchToReviewHistory;
+
+  function bindButtons(){
+    document.querySelectorAll("button").forEach(btn=>{
+      const t = (btn.innerText || "").trim();
+
+      if(t.includes("保存到赛后复盘")){
+        btn.type = "button";
+        btn.onclick = window.jaxSavePrematchToReviewHistory;
+      }
+      if(t.includes("查看复盘历史")){
+        btn.type = "button";
+        btn.onclick = window.jaxRenderReviewHistory;
+      }
+      if(t.includes("清空复盘历史")){
+        btn.type = "button";
+        btn.onclick = window.jaxClearReviewHistory;
+      }
+    });
+  }
+
+  // 关键：捕获阶段拦截，阻止旧 onclick 只跳转不保存
+  document.addEventListener("click", function(e){
+    const btn = e.target && e.target.closest ? e.target.closest("button") : null;
+    if(!btn) return;
+
+    const t = (btn.innerText || "").trim();
+    if(t.includes("保存到赛后复盘")){
+      e.preventDefault();
+      e.stopPropagation();
+      if(e.stopImmediatePropagation) e.stopImmediatePropagation();
+      window.jaxSavePrematchToReviewHistory();
+      return false;
+    }
+  }, true);
+
+  function boot(){
+    bindButtons();
+    window.jaxRenderReviewHistory();
+  }
+
+  window.addEventListener("DOMContentLoaded", boot);
+  setTimeout(boot, 200);
+  setTimeout(boot, 800);
+  setTimeout(boot, 1500);
 })();
 
 </script>
