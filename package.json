@@ -1,6 +1,6 @@
 {
-  "name": "jax-ai-model-v6-4-review-save-event-capture",
-  "version": "6.4.0",
+  "name": "jax-ai-model-v6-5-review-result-fill",
+  "version": "6.5.0",
   "private": true,
   "type": "module",
   "engines": {
