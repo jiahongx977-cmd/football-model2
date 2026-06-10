@@ -147,7 +147,7 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
 </head>
 <body>
 <header><h1>JAX的AI模型</h1>
-<p>联网赔率 + 天气/战意/教练/阵容/体能/裁判因素 + 模型比分池 + Dutching + 滚球对冲OCR + 赛后复盘｜V6.6</p>
+<p>联网赔率 + 天气/战意/教练/阵容/体能/裁判因素 + 模型比分池 + Dutching + 滚球对冲OCR + 赛后复盘｜V6.7</p>
 </header>
 <div class="notice">
   使用说明：API Key 仍然只放在 Vercel 环境变量 <b>THE_ODDS_API_KEY</b> 中，朋友打开网站不需要自己填 Key。
@@ -771,7 +771,7 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
       </div>
 </section>
 </main>
-<footer>JAX的AI模型｜V6.6 复盘模块彻底修正版｜复盘记录去重、可补实际比分、保存/查看/清空全部生效。</footer>
+<footer>JAX的AI模型｜V6.7 复盘重复模块清理版｜只保留新版复盘历史模块，隐藏旧版重复区域。</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js">
 function previewDutchImage(e){
@@ -8504,6 +8504,113 @@ document.addEventListener("DOMContentLoaded", function(){
   setTimeout(boot, 300);
   setTimeout(boot, 1000);
   setTimeout(boot, 1800);
+})();
+
+</script>
+<script>
+
+/* V6.7 remove duplicate review panels
+   只保留 V6.6/V6.7 新复盘模块 v66ReviewPanel。
+   隐藏旧版“赛后复盘历史记录”模块，避免页面出现两个重复区域。
+*/
+(function(){
+  function el(id){ return document.getElementById(id); }
+
+  function removeDuplicateReviewPanels(){
+    const review = el("review") || Array.from(document.querySelectorAll("section,.tab")).find(x => (x.innerText||"").includes("赛后复盘"));
+    if(!review) return;
+
+    const newPanel = el("v66ReviewPanel");
+    const headings = Array.from(review.querySelectorAll("h1,h2,h3"));
+
+    headings.forEach(h => {
+      const text = (h.innerText || "").trim();
+
+      if(text.includes("赛后复盘历史记录")){
+        const panel = h.closest(".v66ReviewPanel,.card,.reviewLoopBox,.historyBox,section,div");
+
+        if(panel && panel.id !== "v66ReviewPanel"){
+          // 如果是新版模块的标题，不隐藏
+          if(panel.querySelector && panel.querySelector("#v66ReviewHistoryBox")) return;
+
+          // 旧模块一般包含：本次复盘备注、保存当前复盘记录、查看复盘历史、清空复盘历史
+          const pText = panel.innerText || "";
+          if(
+            pText.includes("本次复盘备注") ||
+            pText.includes("保存当前复盘记录") ||
+            pText.includes("查看复盘历史") ||
+            pText.includes("清空复盘历史") ||
+            pText.includes("暂无复盘历史")
+          ){
+            panel.style.display = "none";
+            panel.setAttribute("data-v67-hidden-duplicate-review", "true");
+          }
+        }
+      }
+    });
+
+    // 再兜底隐藏旧历史容器，避免按钮或空框残留
+    Array.from(review.querySelectorAll(".result-box")).forEach(box => {
+      if(box.id !== "v66ReviewHistoryBox"){
+        const t = box.innerText || "";
+        if(t.includes("暂无复盘历史") || t.includes("暂无赛后复盘历史")){
+          const parentCard = box.closest(".card,.reviewLoopBox,.historyBox");
+          if(parentCard && parentCard.id !== "v66ReviewPanel"){
+            parentCard.style.display = "none";
+            parentCard.setAttribute("data-v67-hidden-duplicate-review", "true");
+          }else{
+            box.style.display = "none";
+          }
+        }
+      }
+    });
+  }
+
+  // 确保“清空复盘历史”等功能仍然走新版模块
+  function rebindReviewButtonsToNewModule(){
+    document.querySelectorAll("button").forEach(btn => {
+      const t = (btn.innerText || "").trim();
+
+      if(t.includes("查看复盘历史") && typeof window.jaxRenderReviewHistory === "function"){
+        btn.onclick = function(e){
+          if(e){ e.preventDefault(); e.stopPropagation(); }
+          window.jaxRenderReviewHistory();
+          return false;
+        };
+      }
+
+      if(t.includes("清空复盘历史") && typeof window.jaxClearReviewHistory === "function"){
+        btn.onclick = function(e){
+          if(e){ e.preventDefault(); e.stopPropagation(); }
+          window.jaxClearReviewHistory();
+          return false;
+        };
+      }
+
+      if(t.includes("保存当前复盘记录") && typeof window.jaxSaveReviewHistory === "function"){
+        btn.onclick = function(e){
+          if(e){ e.preventDefault(); e.stopPropagation(); }
+          window.jaxSaveReviewHistory();
+          return false;
+        };
+      }
+    });
+  }
+
+  function boot(){
+    removeDuplicateReviewPanels();
+    rebindReviewButtonsToNewModule();
+  }
+
+  window.addEventListener("DOMContentLoaded", boot);
+  setTimeout(boot, 300);
+  setTimeout(boot, 1000);
+  setTimeout(boot, 2000);
+
+  // 赛后复盘页切换后可能重新渲染，继续清理
+  document.addEventListener("click", function(){
+    setTimeout(boot, 80);
+  }, true);
 })();
 
 </script>
