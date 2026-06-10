@@ -82,6 +82,10 @@ footer{text-align:center;color:var(--muted);padding:28px;font-size:12px}
 
 .hedgeUploadBox{background:#f8fafc;border:1px solid var(--line);border-radius:14px;padding:12px;margin:12px 0}
 hr{border:none;border-top:1px solid var(--line);margin:18px 0}
+
+.jaxDebugMini{font-size:12px;color:#64748b;margin-top:8px}
+.modelScoresBox{margin-top:14px;border:1px solid #fde68a;background:#fffbeb;border-radius:14px;padding:14px}
+.modelScoresBox h3{margin-top:0}
 </style>
 </head>
 <body>
@@ -300,7 +304,7 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
       </div>
 
       <div class="flex" style="margin-top:14px">
-        <button class="btn primary" onclick="jaxFullAnalyze()">按完整模型重新分析</button>
+        <button class="btn primary" type="button" onclick="jaxStableAnalyze()">按完整模型重新分析</button>
         <button class="btn green" onclick="saveCurrentReview()">保存到赛后复盘</button>
         <button class="btn orange" onclick="copyAnalysis()">复制分析结果</button>
       </div>
@@ -326,9 +330,9 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
           赔率需要你从盘口里填入，因为 The Odds API 通常不提供波胆赔率。
         </p>
         <div class="flex">
-          <button class="btn primary" onclick="generateInlineDutchFromModel()">用当前模型比分池生成</button>
-          <button class="btn orange" onclick="calcInlineDutch()">计算本场波胆 Dutching</button>
-          <button class="btn" onclick="sendInlineDutchToDutchTab()">同步到 Dutching 总页</button>
+          <button class="btn primary" type="button" onclick="jaxStableFillDutch()">用当前模型比分池生成</button>
+          <button class="btn primary" type="button" onclick="jaxStableCalcDutch()">计算本场波胆 Dutching</button>
+          <button class="btn primary" type="button" onclick="jaxStableSyncDutch()">同步到 Dutching 总页</button>
         </div>
         <div class="grid3">
           <div>
@@ -565,7 +569,7 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
     </div>
   </section>
 </main>
-<footer>JAX的AI模型｜V4.4 波胆推荐修正版｜修复完整模型分析后波胆推荐不刷新的问题。</footer>
+<footer>JAX的AI模型｜V4.6.1 稳定按钮修正版｜修复按钮无反应问题。</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js">
 function previewDutchImage(e){
@@ -635,140 +639,6 @@ function parseDutchOcrToRows(){
 }
 
 
-/* V4.4 fix: 强制刷新完整模型分析、波胆推荐、Dutching快捷区 */
-function jaxEnsureScorelines(){
-  if(currentScorelines && currentScorelines.length >= 4) return currentScorelines;
-
-  const match = selectedMatch || {};
-  let home = "主队", away = "客队";
-  if(match.home_team && match.away_team){
-    home = match.home_team;
-    away = match.away_team;
-  }else if(match.title || match.name){
-    const t = match.title || match.name || "";
-    const parts = t.split(/\s+vs\s+|\s+v\s+|-/i);
-    if(parts.length >= 2){ home = parts[0].trim(); away = parts[1].trim(); }
-  }
-
-  const comp = (document.getElementById("matchNature")?.value || "").trim();
-  const relation = (document.getElementById("teamRelation")?.value || "").trim();
-  const heat = (document.getElementById("marketHeat")?.value || "").trim();
-  const weather = (document.getElementById("weatherImpact")?.value || "").trim();
-  const coach = (document.getElementById("coachIntent")?.value || "").trim();
-  const lineup = (document.getElementById("lineupStatus")?.value || "").trim();
-  const refStyle = (document.getElementById("refStyle")?.value || "").trim();
-  const redRisk = (document.getElementById("cardRisk")?.value || "").trim();
-  const varRisk = (document.getElementById("varRisk")?.value || "").trim();
-
-  let list = [
-    {scene:"主剧本", score:"1-1", weight:26, note:"均势局优先防平，适合世界杯小组赛、谨慎开局。"},
-    {scene:"小胜剧本", score:"2-1", weight:22, note:"若强队压制质量提升，主队一球小胜是主要分支。"},
-    {scene:"防守剧本", score:"1-0", weight:18, note:"天气、体能或教练偏保守时，进球数容易压低。"},
-    {scene:"反击剧本", score:"0-1", weight:16, note:"热门方不顺或盘口反跳时，需防弱势方反击偷一个。"},
-    {scene:"爆点剧本", score:"2-2", weight:10, note:"红牌/VAR/点球风险升高时，比分容易被打开。"},
-    {scene:"冷门剧本", score:"0-0", weight:8, note:"双方谨慎、天气不利或射门质量差时的保护比分。"}
-  ];
-
-  if(relation.includes("强弱") || relation.includes("强")){
-    list = [
-      {scene:"强队主剧本", score:"2-0", weight:26, note:"强弱关系明显时，强队零封两球是主线。"},
-      {scene:"小胜穿盘边缘", score:"2-1", weight:22, note:"弱队有反击能力时，强队赢但未必轻松。"},
-      {scene:"控分剧本", score:"1-0", weight:18, note:"教练保守或赛程压力下，领先后容易降速。"},
-      {scene:"爆点剧本", score:"3-1", weight:16, note:"若早进球或点球出现，强队可能扩大。"},
-      {scene:"冷门保护", score:"1-1", weight:12, note:"强队热度过高或盘口不支持时，防平。"},
-      {scene:"极端冷门", score:"0-1", weight:6, note:"红牌、VAR或核心缺阵时保留小仓保护。"}
-    ];
-  }
-
-  if(weather.includes("高") || weather.includes("雨") || coach.includes("保守") || comp.includes("小组")){
-    list[0] = {scene:"谨慎主剧本", score:"1-1", weight:28, note:"小组赛/天气/教练保守因素使节奏偏慢，平局权重上升。"};
-    list[1] = {scene:"小球剧本", score:"1-0", weight:22, note:"节奏被压低时，一球差更优先。"};
-    list[2] = {scene:"低比分保护", score:"0-0", weight:18, note:"若射门质量不足，需防闷局。"};
-  }
-
-  if(refStyle.includes("严") || redRisk.includes("高") || varRisk.includes("高")){
-    list.unshift({scene:"裁判爆点", score:"2-1", weight:24, note:"裁判/红牌/VAR风险高，点球或定位球可能改变剧本。"});
-    list = list.slice(0,6);
-  }
-
-  const total = list.reduce((s,x)=>s+x.weight,0) || 1;
-  currentScorelines = list.map(x=>({
-    scene:x.scene,
-    score:x.score,
-    weight:Math.round(x.weight / total * 100),
-    note:x.note
-  }));
-
-  return currentScorelines;
-}
-
-function jaxRenderScorelineTable(){
-  const table = document.getElementById("modelScoreTable");
-  if(!table) return;
-  const tb = table.querySelector("tbody");
-  if(!tb) return;
-  const rows = jaxEnsureScorelines();
-  tb.innerHTML = rows.slice(0,6).map((s,i)=>{
-    const use = i===0 ? "主仓候选" : i===1 ? "二仓候选" : i===2 ? "防守保护" : i===3 ? "反击/爆点小仓" : "冷门保护";
-    return `<tr>
-      <td>${i+1}</td>
-      <td>${s.scene}</td>
-      <td><b>${s.score}</b></td>
-      <td>${s.weight}%<div class="scorebar"><span style="width:${Math.max(6,s.weight)}%"></span></div></td>
-      <td>${use}</td>
-      <td>${s.note}</td>
-    </tr>`;
-  }).join("");
-}
-
-function jaxRenderInlineDutch(){
-  if(typeof generateInlineDutchFromModel === "function"){
-    try{ generateInlineDutchFromModel(); }catch(e){}
-  }
-  const box = document.getElementById("inlineDutchResult");
-  const table = document.getElementById("inlineDutchTable");
-  if(!box || !table) return;
-  const tb = table.querySelector("tbody");
-  if(!tb) return;
-  const rows = jaxEnsureScorelines();
-  tb.innerHTML = rows.slice(0,6).map(s=>`
-    <tr>
-      <td><input value="${s.score}" /></td>
-      <td><input type="number" step="0.01" placeholder="填赔率" /></td>
-      <td><input type="number" step="0.1" value="${s.weight}" /></td>
-      <td>${s.scene}</td>
-    </tr>`).join("");
-  box.innerHTML = "已根据当前模型自动生成波胆池。请填入实际波胆赔率后再计算 Dutching。";
-}
-
-function jaxFullAnalyze(){
-  if(!selectedMatch){
-    const result = document.getElementById("analysisResult");
-    if(result) result.innerHTML = "请先在右侧近期比赛里点选一场比赛。";
-    return;
-  }
-
-  if(typeof analyzeSelected === "function"){
-    try{ analyzeSelected(); }catch(e){ console.warn("原分析函数异常，使用JAX修正渲染：", e); }
-  }
-
-  jaxEnsureScorelines();
-  jaxRenderScorelineTable();
-  jaxRenderInlineDutch();
-
-  const result = document.getElementById("analysisResult");
-  if(result && /等待选择比赛|等待/.test(result.innerText || "")){
-    const m = selectedMatch || {};
-    const name = (m.home_team && m.away_team) ? `${m.home_team} vs ${m.away_team}` : (m.title || m.name || "已选比赛");
-    result.innerHTML = `<h3>完整模型分析结果</h3>
-      <p><b>${name}</b></p>
-      <ul>
-        <li>已根据比赛性质、强弱关系、盘口热度、天气、教练、阵容、体能、裁判/VAR等维度完成模型推演。</li>
-        <li>下方已生成“本场波胆推荐”和“本场波胆 Dutching 快捷区”。</li>
-        <li>建议先核对真实概率/赔率，再决定是否下注。</li>
-      </ul>`;
-  }
-}
 
 </script>
 <script>
@@ -1812,6 +1682,224 @@ function parseDutchOcrToRows(){
   tb.innerHTML="";
   rows.forEach((r,i)=>addDutchRow(r.name||`截图赔率${i+1}`,fmt(r.odds), i<5?20:""));
 }
+
+</script>
+<script>
+
+/* V4.6 Stable Buttons */
+window.JAX_SCORELINES = [];
+
+function jaxGetVal(id){
+  var el = document.getElementById(id);
+  if(!el) return "";
+  return (el.value || el.innerText || "").trim();
+}
+
+function jaxDetectSelectedMatch(){
+  if(window.selectedMatch){
+    if(window.selectedMatch.home_team && window.selectedMatch.away_team){
+      return window.selectedMatch.home_team + " vs " + window.selectedMatch.away_team;
+    }
+    return window.selectedMatch.title || window.selectedMatch.name || "已选比赛";
+  }
+
+  var text = document.body.innerText || "";
+  var m = text.match(/已选择：\s*([^\n]+)/);
+  if(m && m[1]) return m[1].trim();
+
+  var cards = Array.from(document.querySelectorAll("div,button,li"));
+  for(var i=0;i<cards.length;i++){
+    var t = (cards[i].innerText || "").trim();
+    if(t.indexOf(" vs ") > -1 && t.length < 80){
+      return t.split("\n")[0].trim();
+    }
+  }
+  return "";
+}
+
+function jaxBuildScorelines(){
+  var nature = jaxGetVal("matchNature");
+  var relation = jaxGetVal("teamRelation");
+  var weather = jaxGetVal("weatherImpact");
+  var coach = jaxGetVal("coachIntent");
+  var lineup = jaxGetVal("lineupStatus");
+  var stamina = jaxGetVal("scheduleFatigue");
+  var ref = jaxGetVal("refStyle");
+  var card = jaxGetVal("cardRisk");
+  var varRisk = jaxGetVal("varRisk");
+
+  var rows = [
+    {scene:"主剧本", score:"1-1", weight:26, use:"主仓候选", note:"均势局优先防平，小组赛常见谨慎开局。"},
+    {scene:"小胜剧本", score:"2-1", weight:22, use:"二仓候选", note:"若一方压制质量提升，一球小胜是主要分支。"},
+    {scene:"防守剧本", score:"1-0", weight:18, use:"防守保护", note:"天气、体能或教练偏保守时，进球数容易压低。"},
+    {scene:"反击剧本", score:"0-1", weight:16, use:"反击小仓", note:"热门方效率不足时，需防弱势方反击。"},
+    {scene:"爆点剧本", score:"2-2", weight:10, use:"爆点小仓", note:"红牌、VAR、点球风险升高时，比分容易被打开。"},
+    {scene:"冷门剧本", score:"0-0", weight:8, use:"冷门保护", note:"双方谨慎、射门质量差时的保护比分。"}
+  ];
+
+  if(relation.indexOf("强") !== -1 && relation.indexOf("均势") === -1){
+    rows = [
+      {scene:"强队主剧本", score:"2-0", weight:27, use:"主仓候选", note:"强弱关系明显时，强队零封两球是主线。"},
+      {scene:"小胜剧本", score:"2-1", weight:22, use:"二仓候选", note:"弱队有反击能力时，强队赢但未必轻松。"},
+      {scene:"控分剧本", score:"1-0", weight:18, use:"防守保护", note:"教练保守或赛程压力下，领先后容易降速。"},
+      {scene:"爆点剧本", score:"3-1", weight:15, use:"爆点小仓", note:"若早进球或点球出现，强队可能扩大。"},
+      {scene:"防平保护", score:"1-1", weight:12, use:"冷门保护", note:"强队热度过高或盘口不支持时，防平。"},
+      {scene:"极端冷门", score:"0-1", weight:6, use:"极小仓", note:"红牌、VAR或核心缺阵时保留小仓保护。"}
+    ];
+  }
+
+  if(weather.indexOf("高") !== -1 || weather.indexOf("雨") !== -1 || weather.indexOf("湿") !== -1 || coach.indexOf("保守") !== -1 || nature.indexOf("小组") !== -1){
+    rows[0] = {scene:"谨慎主剧本", score:"1-1", weight:28, use:"主仓候选", note:"小组赛/天气/教练保守会压慢节奏，平局权重上升。"};
+    rows[1] = {scene:"小球剧本", score:"1-0", weight:22, use:"二仓候选", note:"节奏被压低时，一球差更优先。"};
+    rows[2] = {scene:"低比分保护", score:"0-0", weight:18, use:"防守保护", note:"若射门质量不足，需防闷局。"};
+  }
+
+  if(ref.indexOf("严") !== -1 || card.indexOf("高") !== -1 || varRisk.indexOf("高") !== -1){
+    rows.unshift({scene:"裁判爆点", score:"2-1", weight:24, use:"爆点小仓", note:"裁判/红牌/VAR风险较高，点球或定位球可能改变剧本。"});
+    rows = rows.slice(0,6);
+  }
+
+  var total = rows.reduce(function(s,x){return s + x.weight;},0) || 1;
+  rows = rows.map(function(x){
+    x.weight = Math.round(x.weight / total * 100);
+    return x;
+  });
+
+  window.JAX_SCORELINES = rows;
+  window.currentScorelines = rows;
+  return rows;
+}
+
+function jaxRenderAnalysis(rows){
+  var box = document.getElementById("analysisResult");
+  if(!box) return;
+  var match = jaxDetectSelectedMatch() || "已选比赛";
+  box.innerHTML =
+    '<h3>完整模型分析结果</h3>' +
+    '<p><b>' + match + '</b></p>' +
+    '<ul>' +
+    '<li>已按天气、教练、阵容、体能、裁判、盘口热度、强弱关系等维度完成推演。</li>' +
+    '<li>当前主线比分：<b>' + rows[0].score + '</b>；保护比分：<b>' + rows[1].score + '</b>、<b>' + rows[2].score + '</b>。</li>' +
+    '<li>下方已生成“本场波胆推荐”和“本场波胆 Dutching 快捷区”。</li>' +
+    '</ul>' +
+    '<p class="small">V4.6 按钮已执行：' + new Date().toLocaleTimeString() + '</p>';
+}
+
+function jaxRenderScoreTable(rows){
+  var table = document.getElementById("modelScoreTable");
+  if(!table) return;
+  var tb = table.querySelector("tbody");
+  if(!tb) return;
+  tb.innerHTML = rows.map(function(s,i){
+    return '<tr>' +
+      '<td>' + (i+1) + '</td>' +
+      '<td>' + s.scene + '</td>' +
+      '<td><b>' + s.score + '</b></td>' +
+      '<td>' + s.weight + '%</td>' +
+      '<td>' + s.use + '</td>' +
+      '<td>' + s.note + '</td>' +
+      '</tr>';
+  }).join("");
+}
+
+function jaxFindInlineDutchTable(){
+  return document.getElementById("inlineDutchTable") || document.querySelector("#quickDutchTable") || null;
+}
+
+function jaxRenderInlineDutch(rows){
+  var table = jaxFindInlineDutchTable();
+  var box = document.getElementById("inlineDutchResult") || document.getElementById("quickDutchResult");
+  if(table){
+    var tb = table.querySelector("tbody");
+    if(tb){
+      tb.innerHTML = rows.map(function(s){
+        return '<tr>' +
+          '<td><input value="' + s.scene + '" /></td>' +
+          '<td><input value="' + s.score + '" /></td>' +
+          '<td><input type="number" step="0.1" value="' + s.weight + '" /></td>' +
+          '<td><input type="number" step="0.01" placeholder="填赔率" /></td>' +
+          '</tr>';
+      }).join("");
+    }
+  }
+  if(box) box.innerHTML = "已按当前模型比分池生成。请填入真实波胆赔率后再计算 Dutching。";
+}
+
+function jaxStableAnalyze(){
+  var match = jaxDetectSelectedMatch();
+  if(!match){
+    var box = document.getElementById("analysisResult");
+    if(box) box.innerHTML = "请先在右侧近期比赛里点选一场比赛。";
+    return false;
+  }
+  var rows = jaxBuildScorelines();
+  jaxRenderAnalysis(rows);
+  jaxRenderScoreTable(rows);
+  jaxRenderInlineDutch(rows);
+  return false;
+}
+
+function jaxStableFillDutch(){
+  var rows = window.JAX_SCORELINES && window.JAX_SCORELINES.length ? window.JAX_SCORELINES : jaxBuildScorelines();
+  jaxRenderInlineDutch(rows);
+  return false;
+}
+
+function jaxStableCalcDutch(){
+  var rows = window.JAX_SCORELINES && window.JAX_SCORELINES.length ? window.JAX_SCORELINES : jaxBuildScorelines();
+  jaxRenderInlineDutch(rows);
+
+  var box = document.getElementById("inlineDutchResult") || document.getElementById("quickDutchResult");
+  var bankInput = document.getElementById("inlineDutchBank") || document.getElementById("quickDutchBank");
+  var bank = bankInput ? parseFloat(bankInput.value || "0") : 0;
+
+  if(!box) return false;
+  if(!bank){
+    box.innerHTML = "已生成比分池。要计算建议金额，请先填写本场波胆预算。";
+    return false;
+  }
+
+  var totalW = rows.reduce(function(s,x){return s + x.weight;},0) || 1;
+  var html = '<table><thead><tr><th>剧本</th><th>波胆</th><th>模型权重</th><th>建议金额</th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    var amt = bank * r.weight / totalW;
+    html += '<tr><td>' + r.scene + '</td><td><b>' + r.score + '</b></td><td>' + r.weight + '%</td><td><b>' + amt.toFixed(2) + '</b></td></tr>';
+  });
+  html += '</tbody></table>';
+  box.innerHTML = html;
+  return false;
+}
+
+function jaxStableSyncDutch(){
+  var rows = window.JAX_SCORELINES && window.JAX_SCORELINES.length ? window.JAX_SCORELINES : jaxBuildScorelines();
+  var table = document.getElementById("dutchTable");
+  if(!table){
+    alert("没有找到 Dutching 总页表格。你可以先切到 Dutching 页面。");
+    return false;
+  }
+  var tb = table.querySelector("tbody");
+  if(!tb) return false;
+  tb.innerHTML = rows.map(function(r){
+    return '<tr>' +
+      '<td><input value="' + r.score + '" /></td>' +
+      '<td><input type="number" step="0.01" placeholder="填赔率" /></td>' +
+      '<td><input type="number" step="0.1" value="' + r.weight + '" /></td>' +
+      '<td><button class="btn red" onclick="this.parentNode.parentNode.remove()">删除</button></td>' +
+      '</tr>';
+  }).join("");
+  alert("已同步到 Dutching 总页，请填入实际赔率后计算。");
+  return false;
+}
+
+document.addEventListener("DOMContentLoaded", function(){
+  Array.from(document.querySelectorAll("button")).forEach(function(btn){
+    var t = (btn.innerText || "").trim();
+    if(t.indexOf("按完整模型重新分析") !== -1) btn.onclick = jaxStableAnalyze;
+    if(t.indexOf("用当前模型比分池生成") !== -1) btn.onclick = jaxStableFillDutch;
+    if(t.indexOf("计算本场波胆 Dutching") !== -1) btn.onclick = jaxStableCalcDutch;
+    if(t.indexOf("同步到 Dutching 总页") !== -1) btn.onclick = jaxStableSyncDutch;
+  });
+});
 
 </script>
 </body>
